@@ -1,118 +1,114 @@
-import type { ExpoSpeechRecognitionNativeEventMap } from 'expo-speech-recognition'
-import { useEffect, useEffectEvent } from 'react'
 import { Platform } from 'react-native'
+import type { Voice } from 'expo-speech'
 
 import type { VoiceLanguage } from '@/db/settings'
 import { speech as Speech } from '@/services/speech'
-import { speechRecognition } from '@/services/speechRecognition'
 
-type SpeechRecognitionEvents = {
-  [K in keyof ExpoSpeechRecognitionNativeEventMap]: (event: ExpoSpeechRecognitionNativeEventMap[K]) => void
+export type { Voice } from 'expo-speech'
+
+const normalizeLanguage = (language: string) => language.toLowerCase().replaceAll('_', '-')
+const isFilipino = (language: string) => /^(fil|tl)(-|$)/.test(normalizeLanguage(language))
+
+/** Taglish uses Filipino pronunciation so Tagalog words keep their natural sounds. */
+export function playbackLanguage(text: string, language: VoiceLanguage): 'fil-PH' | 'en-US' {
+  if (language !== 'auto') return language
+  return /\b(ako|ikaw|siya|tayo|kami|kayo|sila|ang|mga|ng|iyong|inyong|aking|ating|natin|naman|po|opo|hindi|huwag|wag|kung|kapag|kailangan|maaari|puwede|pwede|salamat|kumusta|magandang|umaga|gabi|tulong|pumunta|tumawag|ligtas|mayroon|meron|walang|para sa)\b/i.test(text)
+    ? 'fil-PH' : 'en-US'
 }
 
-/** Subscribe only when the installed app includes speech recognition. */
-export function useSpeechRecognitionEvent<K extends keyof ExpoSpeechRecognitionNativeEventMap>(
-  eventName: K,
-  listener: SpeechRecognitionEvents[K],
-) {
-  const onEvent = useEffectEvent(listener)
-
-  useEffect(() => {
-    const subscription = speechRecognition?.addListener(eventName, ((event) => onEvent(event)) as SpeechRecognitionEvents[K])
-    return () => subscription?.remove()
-  }, [eventName])
-}
-
-/** Whether any speech recognizer exists on this device/browser. Checked once at screen mount. */
-export function voiceInputAvailable(): boolean {
-  try {
-    return speechRecognition?.isRecognitionAvailable() ?? false
-  } catch {
-    return false
-  }
-}
-
-/** Whether speech can be recognized fully on-device — the only mode that works offline. */
-export function onDeviceVoiceAvailable(): boolean {
-  try {
-    return speechRecognition?.supportsOnDeviceRecognition() ?? false
-  } catch {
-    return false
-  }
-}
-
-export async function ensureVoicePermissions(): Promise<boolean> {
-  try {
-    const result = await speechRecognition?.requestPermissionsAsync()
-    return result?.granted ?? false
-  } catch {
-    return false
-  }
-}
-
-/**
- * Android needs a downloaded offline pack per locale for on-device recognition;
- * trigger the system download silently when the pack is missing.
- */
-async function ensureOfflineVoicePack(lang: VoiceLanguage) {
-  if (Platform.OS !== 'android' || !speechRecognition) return
-  try {
-    const { installedLocales } = await speechRecognition.getSupportedLocales({
-      androidRecognitionServicePackage: 'com.google.android.as',
+export function matchingVoices(voices: Voice[], language: VoiceLanguage): Voice[] {
+  return voices.filter((voice) => language === 'auto'
+    ? isFilipino(voice.language) || /^en(-|$)/.test(normalizeLanguage(voice.language))
+    : language === 'fil-PH' ? isFilipino(voice.language) : /^en(-|$)/.test(normalizeLanguage(voice.language)))
+    .sort((a, b) => {
+      const score = (voice: Voice) => (voice.quality === 'Enhanced' ? 10 : 0)
+        + (normalizeLanguage(voice.language) === normalizeLanguage(language) ? 2 : 0)
+        + (normalizeLanguage(voice.language) === 'en-ph' ? 1 : 0)
+      return score(b) - score(a) || a.name.localeCompare(b.name) || a.identifier.localeCompare(b.identifier)
     })
-    if (!installedLocales.some((locale) => locale.toLowerCase() === lang.toLowerCase())) {
-      await speechRecognition.androidTriggerOfflineModelDownload({ locale: lang }).catch(() => {})
-    }
-  } catch {}
 }
 
-/**
- * Starts dictation; transcripts arrive via `useSpeechRecognitionEvent` in the
- * chat screen. `onDevice` keeps audio on the phone (works offline) when the OS
- * supports it — otherwise it falls back to the regular network recognizer.
- */
-export async function startVoiceInput({ lang, onDevice }: { lang: VoiceLanguage; onDevice: boolean }) {
-  if (!speechRecognition) throw new Error('Voice input requires a development build with speech recognition enabled.')
-  const deviceOnly = onDevice && onDeviceVoiceAvailable()
-  if (deviceOnly) await ensureOfflineVoicePack(lang)
-  speechRecognition.start({
-    lang,
-    interimResults: true,
-    maxAlternatives: 1,
-    continuous: false,
-    requiresOnDeviceRecognition: deviceOnly,
-    addsPunctuation: true,
-    iosTaskHint: 'dictation',
-    ...(deviceOnly ? { androidIntentOptions: { EXTRA_PREFER_OFFLINE: true } } : {}),
-  })
+/** Re-query so voices installed in phone settings are picked up without restarting. */
+export async function availableVoices(): Promise<Voice[]> {
+  if (!Speech) return []
+  return Speech.getAvailableVoicesAsync()
 }
 
-/** Stops listening and delivers the final transcript. */
-export function stopVoiceInput() {
-  speechRecognition?.stop()
+let request = 0
+let activeEnd: (() => void) | undefined
+let stopping = Promise.resolve()
+
+function stopEngine() {
+  stopping = stopping.then(() => Speech?.stop()).then(() => {}, () => {})
+  return stopping
 }
 
-/** Abandons the session — no transcript is delivered. */
-export function cancelVoiceInput() {
-  speechRecognition?.abort()
-}
-
-/** Speaks text with the OS voice engine; `onEnd` fires when it finishes or is cut short. */
-export function speak(text: string, lang: VoiceLanguage, onEnd?: () => void, onError?: () => void) {
-  const fail = () => {
+/** Speaks using an installed voice, preferring enhanced voices in the reply's language. */
+export function speak(text: string, lang: VoiceLanguage, onEnd?: () => void, onError?: (message?: string) => void, voiceIdentifier = '') {
+  const id = ++request
+  activeEnd?.()
+  let finished = false
+  const finish = () => {
+    if (finished) return
+    finished = true
+    if (id === request) activeEnd = undefined
     onEnd?.()
-    onError?.()
   }
-  if (!Speech) {
-    fail()
-    return
+  activeEnd = finish
+  const fail = (message?: string) => {
+    if (id !== request || finished) return
+    finish()
+    onError?.(message)
   }
-  void Speech.stop().catch(() => {})
-  try {
-    Speech.speak(text, { language: lang, onDone: onEnd, onStopped: onEnd, onError: fail })
-  } catch {
-    fail()
-  }
+
+  void (async () => {
+    try {
+      const engine = Speech
+      if (!engine) { fail(); return }
+      await stopEngine()
+      const voices = await availableVoices()
+      if (id !== request) return
+      const language = playbackLanguage(text, lang)
+      const candidates = matchingVoices(voices, language)
+      const voice = candidates.find((item) => item.identifier === voiceIdentifier) ?? candidates[0]
+      if (voices.length && !voice) {
+        fail(`Install ${language === 'fil-PH' ? 'a Filipino / Tagalog' : 'an English'} voice in your device's text-to-speech settings, then try again.`)
+        return
+      }
+      // Avoid reading Markdown syntax aloud.
+      const spoken = text.replace(/```[\s\S]*?```/g, '')
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+        .replace(/^\s{0,3}(?:#{1,6}\s+|[-*+]\s+)/gm, '')
+        .replace(/[*_`]/g, '').trim()
+      if (!spoken) { finish(); return }
+      // Android engines cap input length. Read long replies in order without truncation.
+      const limit = Math.max(1, Math.min(engine.maxSpeechInputLength || 3000, 3000))
+      let remaining = spoken
+      const next = () => {
+        if (id !== request || finished) return
+        if (!remaining) { finish(); return }
+        let end = Math.min(remaining.length, limit)
+        if (end < remaining.length) {
+          const boundary = remaining.lastIndexOf(' ', end)
+          if (boundary > end / 2) end = boundary
+        }
+        const chunk = remaining.slice(0, end)
+        remaining = remaining.slice(end).trimStart()
+        try {
+          engine.speak(chunk, {
+            language: voice?.language ?? language,
+            voice: voice?.identifier,
+            rate: 0.95,
+            pitch: 1,
+            onDone: next,
+            onStopped: finish,
+            onError: () => fail(),
+          })
+        } catch { fail() }
+      }
+      next()
+    } catch { fail() }
+  })()
 }
 
 export function voiceOutputAvailable(): boolean {
@@ -120,5 +116,8 @@ export function voiceOutputAvailable(): boolean {
 }
 
 export function stopSpeaking() {
-  void Speech?.stop().catch(() => {})
+  ++request
+  activeEnd?.()
+  activeEnd = undefined
+  void stopEngine()
 }

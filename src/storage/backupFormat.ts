@@ -59,7 +59,8 @@ export function parseBackup(raw: string): Backup {
     settings.avatarTone = candidate.settings.avatarTone
   }
   if (isAvatarPreset(candidate.settings.avatarPreset)) {
-    settings.avatarPreset = candidate.settings.avatarPreset
+    settings.avatarPreset =
+      candidate.settings.avatarPreset === 'auto' ? 'morion' : candidate.settings.avatarPreset
   }
   return {
     app: 'GabAI',

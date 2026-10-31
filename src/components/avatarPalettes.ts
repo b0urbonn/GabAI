@@ -1,10 +1,4 @@
-import {
-  AVATAR_TONES,
-  ILLUSTRATED_AVATARS,
-  type AvatarPreset,
-  type AvatarTone,
-  type IllustratedAvatar,
-} from '@/db/settings'
+import type { AvatarTone } from '@/db/settings'
 import type { ColorScheme } from '@/theme/tokens'
 
 export type TonePalette = {
@@ -48,46 +42,6 @@ export const AVATAR_PALETTES: Record<AvatarTone, { label: string; light: TonePal
   },
 }
 
-export const ILLUSTRATED_AVATAR_META: Record<IllustratedAvatar, { label: string; description: string }> = {
-  morion: { label: 'Morion', description: 'Marinduque guardian' },
-  responder: { label: 'Hero', description: 'Safety responder' },
-  gabai: { label: 'GabAI', description: 'Smart companion' },
-  explorer: { label: 'Scout', description: 'Island explorer' },
-  medic: { label: 'Medic', description: 'First aid helper' },
-  islander: { label: 'Local', description: 'Sunny islander' },
-  bantay: { label: 'Bantay', description: 'Loyal rescue pup' },
-  ming: { label: 'Ming', description: 'Cozy island cat' },
-}
-
 export function getAvatarPalette(tone: AvatarTone, scheme: ColorScheme): TonePalette {
   return AVATAR_PALETTES[tone][scheme]
-}
-
-export function getInitials(name: string): string {
-  return name
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('')
-}
-
-export function getAvatarPresetLabel(preset: AvatarPreset): string {
-  if (preset === 'auto') return 'Auto'
-  if (preset === 'initials') return 'Initials'
-  return ILLUSTRATED_AVATAR_META[preset].label
-}
-
-export type RandomAvatarCombo = {
-  avatar: IllustratedAvatar
-  tone: AvatarTone
-}
-
-export function pickRandomAvatarCombo(exclude?: Partial<RandomAvatarCombo>): RandomAvatarCombo {
-  const avatarPool = ILLUSTRATED_AVATARS.filter((item) => item !== exclude?.avatar)
-  const tonePool = AVATAR_TONES.filter((item) => item !== exclude?.tone)
-  const avatar = avatarPool[Math.floor(Math.random() * avatarPool.length)] ?? ILLUSTRATED_AVATARS[0]
-  const tone = tonePool[Math.floor(Math.random() * tonePool.length)] ?? AVATAR_TONES[0]
-  return { avatar, tone }
 }

@@ -42,3 +42,6 @@ yarn-error.*
 
 # video project (Remotion) — kept out of the repo
 /video
+
+# build artifacts
+*.apk

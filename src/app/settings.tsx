@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 
 import { AppText } from '@/components/ui/AppText'
+import { FadeIn } from '@/components/ui/FadeIn'
 import { GroupedCard } from '@/components/ui/GroupedCard'
 import { Icon, type IconName } from '@/components/ui/Icon'
 import { BackButton, Banner, PageHeader, SettingsLabel } from '@/components/ui/Layout'
@@ -93,6 +94,7 @@ export default function SettingsScreen() {
       <BackButton />
       <PageHeader title="Settings" subtitle="Make GabAI work better for you." />
 
+      <FadeIn>
       <View style={[styles.section, styles.firstSection]}>
         <SettingsLabel>Appearance</SettingsLabel>
         <View style={[styles.card, { backgroundColor: colors.surface }]}>
@@ -146,14 +148,18 @@ export default function SettingsScreen() {
           </View>
         </View>
       </View>
+      </FadeIn>
 
+      <FadeIn delay={90}>
       <View style={styles.section}>
-        <SettingsLabel>AI Chatbot</SettingsLabel>
+        <SettingsLabel>GabAI</SettingsLabel>
         <GroupedCard>
           <ListRow title="Chatbot settings" subtitle="Local or cloud AI" leading="chat" onPress={() => router.push('/chat-settings')} />
         </GroupedCard>
       </View>
+      </FadeIn>
 
+      <FadeIn delay={170}>
       <View style={styles.section}>
         <SettingsLabel>Backup & restore</SettingsLabel>
         <GroupedCard>
@@ -161,13 +167,16 @@ export default function SettingsScreen() {
           <ListRow title="Restore data" subtitle="Import a GabAI backup" leading="restore" onPress={restoreBackup} />
         </GroupedCard>
       </View>
+      </FadeIn>
 
+      <FadeIn delay={240}>
       <View style={styles.section}>
         <SettingsLabel>Manage data</SettingsLabel>
         <GroupedCard>
           <ListRow title="Clear data" subtitle="Delete everything stored on this device" leading="trash" destructive onPress={clearData} />
         </GroupedCard>
       </View>
+      </FadeIn>
 
       {feedback && <Banner text={feedback.text} tone={feedback.error ? 'error' : 'info'} />}
     </Screen>

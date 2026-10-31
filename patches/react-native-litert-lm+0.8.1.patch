@@ -1,0 +1,12 @@
+diff --git a/node_modules/react-native-litert-lm/android/consumer-rules.pro b/node_modules/react-native-litert-lm/android/consumer-rules.pro
+new file mode 100644
+index 0000000..b245b69
+--- /dev/null
++++ b/node_modules/react-native-litert-lm/android/consumer-rules.pro
+@@ -0,0 +1,6 @@
++# Consumer ProGuard rules for react-native-litert-lm.
++# The engine's HybridObjects are created through JNI — keep them if the app
++# ever enables minification.
++-keep class dev.litert.** { *; }
++-keep class com.margelo.nitro.** { *; }
++-keep class com.facebook.jni.** { *; }

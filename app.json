@@ -3,14 +3,18 @@
     "name": "GabAI",
     "slug": "gabai",
     "scheme": "gabai",
-    "version": "1.0.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "entitlements": {
+        "com.apple.developer.kernel.extended-virtual-addressing": true
+      }
     },
     "android": {
+      "versionCode": 3,
       "adaptiveIcon": {
         "backgroundColor": "#e8590c",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -44,8 +48,7 @@
         "expo-image-picker",
         {
           "photosPermission": "GabAI needs access to your photos so you can attach images of hazards or injuries.",
-          "cameraPermission": "GabAI needs camera access so you can capture images of hazards or injuries.",
-          "microphonePermission": "GabAI uses the microphone so you can talk to the assistant."
+          "cameraPermission": "GabAI needs camera access so you can capture images of hazards or injuries."
         }
       ],
       "expo-secure-store",
@@ -55,15 +58,16 @@
           "locationWhenInUsePermission": "GabAI uses your location to show emergency hotlines for the barangay you are in."
         }
       ],
-      "llama.rn",
       [
-        "expo-speech-recognition",
+        "expo-audio",
         {
-          "microphonePermission": "GabAI uses the microphone so you can talk to the assistant.",
-          "speechRecognitionPermission": "GabAI transcribes what you say into a chat message.",
-          "androidSpeechServicePackages": ["com.google.android.googlequicksearchbox", "com.google.android.as"]
+          "microphonePermission": "GabAI uses the microphone to record voice messages for the assistant."
         }
-      ]
+      ],
+      "expo-build-properties",
+      "react-native-litert-lm",
+      "expo-asset",
+      "expo-image"
     ],
     "experiments": {
       "typedRoutes": true

@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 
 import { AppText } from '@/components/ui/AppText'
+import { FadeIn } from '@/components/ui/FadeIn'
 import { Icon } from '@/components/ui/Icon'
 import { BackButton, Note, PageHeader, SectionHeader, TextButton } from '@/components/ui/Layout'
 import { Screen } from '@/components/ui/Screen'
@@ -130,6 +131,7 @@ export default function EmergencyScreen() {
     <Screen topInset>
       <BackButton />
       <PageHeader title="Emergency contacts" subtitle="Choose a service to call. Cellular service is required." />
+      <FadeIn delay={60}>
       <View style={styles.list}>
         <SectionHeader
           title="Local hotlines"
@@ -173,6 +175,7 @@ export default function EmergencyScreen() {
         <SectionHeader title="National" />
         {nationalContacts.map((contact) => <ContactRow key={contact.label} contact={contact} />)}
       </View>
+      </FadeIn>
     </Screen>
   )
 }

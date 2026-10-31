@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { GuideIllustration } from '@/components/GuideIllustration'
 import { AppText } from '@/components/ui/AppText'
 import { Button } from '@/components/ui/Button'
+import { FadeIn } from '@/components/ui/FadeIn'
 import { Icon } from '@/components/ui/Icon'
 import { IconTile } from '@/components/ui/IconTile'
 import { Touchable } from '@/components/ui/Touchable'
@@ -47,10 +48,12 @@ export default function GuideSheet() {
         </Touchable>
       </View>
 
+      <FadeIn delay={80}>
       <View style={[styles.illustration, { backgroundColor: colors.background }]}>
         <GuideIllustration guide={guide} phase={phase.label} />
       </View>
       <AppText variant="small" tone="soft" style={styles.illustrationCaption}>{artwork?.caption ?? guide.detail}</AppText>
+      </FadeIn>
 
       {!isAid ? (
         <>

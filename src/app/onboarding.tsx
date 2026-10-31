@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Keyboard, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native'
 
 import { AddressField } from '@/components/AddressField'
+import { randomAvatarSeed } from '@/components/MicahAvatar'
 import { DetailsStep } from '@/components/onboarding/DetailsStep'
 import { FeatureStep, type FeatureSlide } from '@/components/onboarding/FeatureStep'
 import { IdentityStep } from '@/components/onboarding/IdentityStep'
@@ -145,7 +146,7 @@ export default function OnboardingScreen() {
 
       await updateSettings({
         nickname: trimmedNickname,
-        avatarPreset: settings.avatarPhoto ? settings.avatarPreset : 'auto',
+        avatarSeed: settings.avatarSeed || randomAvatarSeed(),
         onboarded: true,
       })
       router.replace('/')

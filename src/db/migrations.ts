@@ -66,6 +66,38 @@ const migrations: ((db: SQLiteDatabase) => Promise<void>)[] = [
       ALTER TABLE token_usage_new RENAME TO token_usage;
     `)
   },
+  // Track assistant generation so a streamed reply survives app interruption and retry.
+  async (db) => {
+    await db.execAsync(`
+      ALTER TABLE chat_messages ADD COLUMN status TEXT NOT NULL DEFAULT 'done';
+      ALTER TABLE chat_messages ADD COLUMN error TEXT;
+    `)
+  },
+  // Voice note attachments are stored alongside photos and referenced by file name.
+  async (db) => {
+    await db.execAsync(`
+      ALTER TABLE chat_messages ADD COLUMN audio TEXT;
+      ALTER TABLE chat_messages ADD COLUMN audio_mime TEXT;
+      ALTER TABLE chat_messages ADD COLUMN audio_duration INTEGER;
+    `)
+  },
+  async (db) => {
+    await db.execAsync(`
+      CREATE TABLE public_update_cache (
+        source TEXT PRIMARY KEY NOT NULL,
+        payload TEXT NOT NULL
+      );
+    `)
+  },
+  // Last successful Open-Meteo payloads so the weather card can show stale data offline.
+  async (db) => {
+    await db.execAsync(`
+      CREATE TABLE weather_cache (
+        kind TEXT PRIMARY KEY NOT NULL,
+        payload TEXT NOT NULL
+      );
+    `)
+  },
 ]
 
 export async function migrateDbIfNeeded(db: SQLiteDatabase) {

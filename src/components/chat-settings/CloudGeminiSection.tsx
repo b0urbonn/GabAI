@@ -1,6 +1,7 @@
 import * as Linking from 'expo-linking'
 import { useEffect, useMemo, useState } from 'react'
 import {
+  ActivityIndicator,
   Modal,
   Pressable,
   ScrollView,
@@ -9,10 +10,10 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import type { SettingsFeedback } from '@/components/chat-settings/LocalModelSection'
 import { AppText } from '@/components/ui/AppText'
-import { Button } from '@/components/ui/Button'
 import { GroupedCard } from '@/components/ui/GroupedCard'
 import { Icon } from '@/components/ui/Icon'
 import { SettingsLabel } from '@/components/ui/Layout'
@@ -23,15 +24,14 @@ import { useSettings } from '@/providers/SettingsProvider'
 import { GeminiError, testGeminiKey } from '@/services/gemini'
 import { clearModelCache, fetchAvailableModels, modelLabel, resolveModel } from '@/services/geminiModels'
 import { deleteGeminiKey, getGeminiKey, setGeminiKey } from '@/storage/secrets'
-import { radius, space, touchTarget, typeRamp } from '@/theme/tokens'
+import type { ReplyLength } from '@/db/settings'
+import { radius, space } from '@/theme/tokens'
 import { useTheme } from '@/theme/useTheme'
 import { confirmAction } from '@/utils/dialogs'
 
-const SETUP_STEPS = [
-  '1. Tap "Get free API key" below to open Google AI Studio.',
-  '2. Sign in with your Google account.',
-  '3. Tap "Create API key" and copy it.',
-  '4. Come back to GabAI and paste it above, then tap Save.',
+const REPLY_LENGTHS: { value: ReplyLength; label: string }[] = [
+  { value: 'short', label: 'Short' },
+  { value: 'detailed', label: 'Detailed' },
 ]
 
 export function CloudGeminiSection({
@@ -40,42 +40,34 @@ export function CloudGeminiSection({
   onFeedback: (feedback: SettingsFeedback) => void
 }) {
   const { settings, updateSettings } = useSettings()
-  const { colors, scale } = useTheme()
+  const { colors } = useTheme()
+  const insets = useSafeAreaInsets()
   const [apiKey, setApiKey] = useState('')
+  const [editingKey, setEditingKey] = useState(false)
   const [savedKey, setSavedKey] = useState('')
   const [modelPickerOpen, setModelPickerOpen] = useState(false)
   const [busy, setBusy] = useState(false)
-  /** Model ids this API key can reach; null while unknown (never fetched). */
   const [available, setAvailable] = useState<string[] | null>(null)
   const { height: windowHeight } = useWindowDimensions()
 
   const selectedModelLabel = settings.geminiModel === 'auto'
-    ? (available?.length ? `Automatic · ${modelLabel(available[0])}` : 'Automatic')
+    ? 'Automatic'
     : modelLabel(settings.geminiModel)
 
-  // The popup lists every model the key can call, not just the curated catalog.
-  // Catalog entries the key cannot reach stay visible but disabled.
   const pickerModels = useMemo(() => {
     if (available === null) {
       return GEMINI_MODELS.map((option) => ({ id: option.id, label: option.label, detail: option.detail, unavailable: false }))
     }
-    const rows = available.map((id) => {
+    return available.map((id) => {
       const info = getModelInfo(id)
-      return { id, label: info?.label ?? modelLabel(id), detail: info?.detail ?? 'Available on your API key', unavailable: false }
+      return { id, label: info?.label ?? modelLabel(id), detail: info?.detail ?? 'Available on your key', unavailable: false }
     })
-    for (const option of GEMINI_MODELS) {
-      if (!available.includes(option.id)) {
-        rows.push({ id: option.id, label: option.label, detail: 'Not available on this API key', unavailable: true })
-      }
-    }
-    return rows
   }, [available])
 
   useEffect(() => {
     getGeminiKey().then((key) => setSavedKey(key ?? '')).catch(() => setSavedKey(''))
   }, [])
 
-  // Discover which catalog models the saved key can actually call.
   useEffect(() => {
     if (!savedKey) return
     let cancelled = false
@@ -99,9 +91,10 @@ export function CloudGeminiSection({
       setSavedKey(trimmed)
       setAvailable(null)
       setApiKey('')
+      setEditingKey(false)
       onFeedback({ text: 'API key saved.' })
     } catch {
-      onFeedback({ text: 'Unable to save the API key. Please try again.', error: true })
+      onFeedback({ text: 'Unable to save API key.', error: true })
     } finally {
       setBusy(false)
     }
@@ -109,7 +102,12 @@ export function CloudGeminiSection({
 
   const removeKey = async () => {
     onFeedback(null)
-    const confirmed = await confirmAction({ title: 'Remove the API key?', message: 'Cloud AI will be unavailable until you add a new key.', confirmLabel: 'Remove', destructive: true })
+    const confirmed = await confirmAction({
+      title: 'Remove API key?',
+      message: 'Cloud AI will be unavailable until a key is added.',
+      confirmLabel: 'Remove',
+      destructive: true,
+    })
     if (!confirmed) return
     setBusy(true)
     try {
@@ -117,7 +115,7 @@ export function CloudGeminiSection({
       setSavedKey('')
       setAvailable(null)
     } catch {
-      onFeedback({ text: 'Unable to remove the API key. Please try again.', error: true })
+      onFeedback({ text: 'Unable to remove API key.', error: true })
     } finally {
       setBusy(false)
     }
@@ -132,7 +130,7 @@ export function CloudGeminiSection({
       await testGeminiKey(savedKey, resolved.model)
       onFeedback({ text: `Connected to Gemini (${resolved.model}).` })
     } catch (error) {
-      onFeedback({ text: error instanceof GeminiError ? error.message : 'Unable to reach Gemini. Please try again.', error: true })
+      onFeedback({ text: error instanceof GeminiError ? error.message : 'Unable to reach Gemini.', error: true })
     } finally {
       setBusy(false)
     }
@@ -140,127 +138,331 @@ export function CloudGeminiSection({
 
   return (
     <View style={styles.section}>
-      <SettingsLabel>Cloud AI · Google Gemini</SettingsLabel>
-      {savedKey ? (
-        <GroupedCard>
-          <ListRow title="API key saved" subtitle={`•••• ${savedKey.slice(-4)}`} leading="check" />
-          <ListRow title="Remove API key" subtitle="Delete the saved Gemini key" leading="trash" destructive onPress={removeKey} />
-        </GroupedCard>
-      ) : (
-        <View style={[styles.card, { backgroundColor: colors.surface }]}>
-          <TextInput
-            value={apiKey}
-            onChangeText={setApiKey}
-            secureTextEntry
-            autoCapitalize="none"
-            autoCorrect={false}
-            placeholder="Paste your Gemini API key"
-            placeholderTextColor={colors.inkSoft}
-            accessibilityLabel="Gemini API key"
-            style={[styles.input, { color: colors.ink, borderColor: colors.line, fontSize: typeRamp.body.fontSize * scale }]}
-          />
-          <View style={styles.actions}>
-            <Button label="Save" loading={busy} onPress={saveKey} />
-          </View>
-        </View>
-      )}
-      <View style={styles.fieldWrap}>
-        <Touchable
-          onPress={() => setModelPickerOpen(true)}
-          accessibilityRole="button"
-          accessibilityLabel="Gemini model"
-          style={[styles.field, { borderColor: colors.line, backgroundColor: colors.background }]}
-        >
-          <AppText style={styles.fieldValue}>{selectedModelLabel}</AppText>
-          <Icon name="chevronDown" size={18} color={colors.inkSoft} />
+      <SettingsLabel>API CREDENTIALS</SettingsLabel>
+      <GroupedCard>
+        {savedKey && !editingKey ? (
+          <>
+            <ListRow
+              title="Gemini API Key"
+              subtitle={`•••• ${savedKey.slice(-4)} · Stored on device`}
+              leading="cloud"
+              trailing={
+                <View style={[styles.pillBadge, { backgroundColor: colors.tealSoft }]}>
+                  <View style={[styles.statusDot, { backgroundColor: colors.teal }]} />
+                  <AppText variant="caption" tone="teal" weight="600">Saved</AppText>
+                </View>
+              }
+            />
+            <Touchable onPress={testConnection} disabled={busy} style={styles.actionRow}>
+              {busy ? (
+                <ActivityIndicator size="small" color={colors.teal} />
+              ) : (
+                <Icon name="sparkles" size={17} color={colors.teal} />
+              )}
+              <AppText tone="teal" weight="600">Test Connection</AppText>
+            </Touchable>
+            <View style={styles.actionSplit}>
+              <Touchable onPress={() => setEditingKey(true)} disabled={busy} style={styles.actionCell}>
+                <AppText tone="teal" weight="500">Change Key</AppText>
+              </Touchable>
+              <View style={[styles.actionDivider, { backgroundColor: colors.line }]} />
+              <Touchable onPress={removeKey} disabled={busy} style={styles.actionCell}>
+                <AppText tone="danger" weight="500">Remove</AppText>
+              </Touchable>
+            </View>
+          </>
+        ) : (
+          <>
+            <View style={styles.inputRow}>
+              <Icon name="cloud" size={18} color={colors.inkSoft} />
+              <TextInput
+                value={apiKey}
+                onChangeText={setApiKey}
+                placeholder="Paste Gemini API key"
+                placeholderTextColor={colors.inkSoft}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={[styles.input, { color: colors.ink }]}
+                accessibilityLabel="Gemini API key"
+              />
+              {apiKey.length > 0 && (
+                <Touchable onPress={() => setApiKey('')} hitSlop={8}>
+                  <Icon name="close" size={16} color={colors.inkSoft} />
+                </Touchable>
+              )}
+            </View>
+            <View style={styles.actionSplit}>
+              <Touchable onPress={saveKey} disabled={!apiKey.trim() || busy} style={styles.actionCell}>
+                {busy ? (
+                  <ActivityIndicator size="small" color={colors.teal} />
+                ) : (
+                  <AppText tone={!apiKey.trim() ? 'soft' : 'teal'} weight="600">Save Key</AppText>
+                )}
+              </Touchable>
+              {savedKey ? (
+                <>
+                  <View style={[styles.actionDivider, { backgroundColor: colors.line }]} />
+                  <Touchable onPress={() => { setEditingKey(false); setApiKey('') }} disabled={busy} style={styles.actionCell}>
+                    <AppText tone="soft" weight="500">Cancel</AppText>
+                  </Touchable>
+                </>
+              ) : null}
+            </View>
+          </>
+        )}
+      </GroupedCard>
+
+      <View style={styles.footerLinkRow}>
+        <Touchable onPress={() => Linking.openURL('https://aistudio.google.com/apikey')} hitSlop={8} style={styles.linkButton}>
+          <AppText variant="small" tone="teal" weight="500">Get an API key from Google AI Studio</AppText>
+          <Icon name="chevron" size={14} color={colors.teal} />
         </Touchable>
       </View>
 
-      <Modal visible={modelPickerOpen} transparent animationType="fade" onRequestClose={() => setModelPickerOpen(false)}>
-        <View style={styles.modalCenter}>
-          <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: colors.overlay }]} onPress={() => setModelPickerOpen(false)} />
-          <View style={[styles.popup, { backgroundColor: colors.surface }]} accessibilityRole="radiogroup" accessibilityLabel="Gemini model" accessibilityViewIsModal>
-            <AppText variant="sheetTitle" accessibilityRole="header" style={styles.popupTitle}>Gemini model</AppText>
-          <Touchable
-            onPress={() => { void updateSettings({ geminiModel: 'auto' }); setModelPickerOpen(false) }}
-            accessibilityRole="radio"
-            accessibilityState={{ selected: settings.geminiModel === 'auto' }}
-            style={styles.modelRow}
-          >
-            <View style={styles.checkSlot} />
-            <View style={styles.modelBody}>
-              <AppText weight="500" align="center">Automatic</AppText>
-              <AppText variant="small" tone="soft" align="center">
-                {available && available.length > 0
-                  ? `Using ${modelLabel(available[0])}`
-                  : 'Picks the best model your key allows'}
+      <View style={styles.subSection}>
+        <SettingsLabel>MODEL</SettingsLabel>
+        <GroupedCard>
+          <ListRow
+            title="Gemini Model"
+            subtitle={selectedModelLabel}
+            leading="sparkles"
+            trailing={<Icon name="chevron" size={16} color={colors.muted} />}
+            onPress={() => setModelPickerOpen(true)}
+          />
+        </GroupedCard>
+        <AppText variant="small" tone="soft" style={styles.footnote}>
+          Automatic selects the fastest available model and handles rate limits.
+        </AppText>
+      </View>
+
+      <View style={styles.subSection}>
+        <SettingsLabel>PREFERENCES</SettingsLabel>
+        <GroupedCard>
+          <View style={styles.preferenceBlock}>
+            <View style={styles.preferenceHeader}>
+              <AppText weight="500">Reply length</AppText>
+              <AppText variant="caption" tone="soft">
+                {settings.localReplyLength === 'short' ? 'Short (~120 words)' : 'Detailed (up to 10 steps)'}
               </AppText>
             </View>
-            <View style={styles.checkSlot}>{settings.geminiModel === 'auto' && <Icon name="check" size={18} color={colors.teal} />}</View>
-          </Touchable>
-          <ScrollView style={[styles.modelList, { maxHeight: windowHeight * 0.5 }]} keyboardShouldPersistTaps="handled">
-          {pickerModels.map((option) => {
-            const selected = settings.geminiModel === option.id
-            return (
-              <Touchable
-                key={option.id}
-                onPress={() => { void updateSettings({ geminiModel: option.id }); setModelPickerOpen(false) }}
-                accessibilityRole="radio"
-                accessibilityState={{ selected, disabled: option.unavailable }}
-                disabled={option.unavailable}
-                style={[styles.modelRow, option.unavailable && styles.modelUnavailable]}
-              >
-                <View style={styles.checkSlot} />
-                <View style={styles.modelBody}>
-                  <AppText weight="500" align="center" tone={option.unavailable ? 'soft' : 'default'}>{option.label}</AppText>
-                  <AppText variant="small" tone="soft" align="center">{option.detail}</AppText>
-                </View>
-                <View style={styles.checkSlot}>{selected && <Icon name="check" size={18} color={colors.teal} />}</View>
-              </Touchable>
-            )
-          })}
-          </ScrollView>
-          <View style={styles.popupClose}>
-            <Button label="Close" variant="secondary" onPress={() => setModelPickerOpen(false)} />
+            <View
+              style={[styles.segmentedTrack, { backgroundColor: colors.line }]}
+              accessibilityRole="radiogroup"
+              accessibilityLabel="Reply length"
+            >
+              {REPLY_LENGTHS.map((opt) => {
+                const selected = settings.localReplyLength === opt.value
+                return (
+                  <Touchable
+                    key={opt.value}
+                    onPress={() => void updateSettings({ localReplyLength: opt.value })}
+                    pressedScale={0.98}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                    style={[
+                      styles.segmentTab,
+                      selected && [styles.segmentTabActive, { backgroundColor: colors.surface }],
+                    ]}
+                  >
+                    <AppText
+                      variant="small"
+                      tone={selected ? 'default' : 'soft'}
+                      weight={selected ? '600' : '500'}
+                    >
+                      {opt.label}
+                    </AppText>
+                  </Touchable>
+                )
+              })}
+            </View>
           </View>
+        </GroupedCard>
+      </View>
+
+      <Modal visible={modelPickerOpen} transparent animationType="slide" onRequestClose={() => setModelPickerOpen(false)}>
+        <View style={styles.sheetBackdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setModelPickerOpen(false)} />
+          <View style={[styles.sheetModal, { backgroundColor: colors.surface, paddingBottom: insets.bottom + space[3] }]}>
+            <View style={[styles.sheetGrabber, { backgroundColor: colors.line }]} />
+            <View style={styles.sheetHeader}>
+              <AppText variant="sheetTitle">Select Model</AppText>
+              <Touchable onPress={() => setModelPickerOpen(false)} hitSlop={8}>
+                <AppText variant="caption" tone="teal" weight="600">Done</AppText>
+              </Touchable>
+            </View>
+            <ScrollView style={[styles.modelList, { maxHeight: windowHeight * 0.5 }]} keyboardShouldPersistTaps="handled">
+              <Touchable
+                onPress={() => { void updateSettings({ geminiModel: 'auto' }); setModelPickerOpen(false) }}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: settings.geminiModel === 'auto' }}
+                style={styles.modelRow}
+              >
+                <View style={styles.modelBody}>
+                  <AppText weight={settings.geminiModel === 'auto' ? '600' : '500'}>Automatic</AppText>
+                  <AppText variant="small" tone="soft">Recommended · Dynamically routes requests</AppText>
+                </View>
+                {settings.geminiModel === 'auto' && <Icon name="check" size={18} color={colors.teal} />}
+              </Touchable>
+
+              {pickerModels.map((option) => {
+                const selected = settings.geminiModel === option.id
+                return (
+                  <Touchable
+                    key={option.id}
+                    onPress={() => { void updateSettings({ geminiModel: option.id }); setModelPickerOpen(false) }}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected, disabled: option.unavailable }}
+                    disabled={option.unavailable}
+                    style={[styles.modelRow, option.unavailable && styles.modelUnavailable]}
+                  >
+                    <View style={styles.modelBody}>
+                      <AppText weight={selected ? '600' : '500'} tone={option.unavailable ? 'soft' : 'default'}>{option.label}</AppText>
+                      <AppText variant="small" tone="soft">{option.detail}</AppText>
+                    </View>
+                    {selected && <Icon name="check" size={18} color={colors.teal} />}
+                  </Touchable>
+                )
+              })}
+            </ScrollView>
           </View>
         </View>
       </Modal>
-      <View style={styles.actions}>
-        <Button label="Test connection" variant="secondary" disabled={!savedKey} loading={busy} onPress={testConnection} />
-      </View>
-      <View style={[styles.card, { backgroundColor: colors.surface }]}>
-        <AppText weight="600" style={styles.guideTitle}>Get a free Gemini API key</AppText>
-        {SETUP_STEPS.map((step) => (
-          <AppText key={step} variant="caption" tone="soft" style={styles.guideStep}>{step}</AppText>
-        ))}
-        <View style={styles.actions}>
-          <Button label="Get free API key" variant="secondary" onPress={() => Linking.openURL('https://aistudio.google.com/apikey')} />
-        </View>
-      </View>
-      <AppText variant="small" tone="soft" style={styles.footnote}>The free tier has daily limits. When Cloud AI is on, your messages are sent to Google to generate replies. Avoid sharing personal health details. If the cloud is unavailable, GabAI answers offline.</AppText>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
   section: { marginTop: space[6] },
-  card: { borderRadius: radius.group, padding: space[4] },
-  actions: { flexDirection: 'row', marginTop: space[3] },
-  input: { borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space[3], paddingVertical: space[3] },
-  fieldWrap: { marginTop: space[3] },
-  field: { flexDirection: 'row', alignItems: 'center', gap: space[2], borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space[3], minHeight: touchTarget },
-  fieldValue: { flex: 1, minWidth: 0 },
-  modalCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space[5] },
-  popup: { width: '100%', maxWidth: 320, borderRadius: radius.lg, padding: space[5], gap: space[2] },
-  popupTitle: { marginBottom: space[2] },
-  popupClose: { flexDirection: 'row', marginTop: space[2] },
-  modelList: { flexGrow: 0 },
-  modelRow: { flexDirection: 'row', alignItems: 'center', gap: space[3], padding: space[3] },
-  modelBody: { flex: 1, minWidth: 0, alignItems: 'center' },
-  modelUnavailable: { opacity: 0.45 },
-  checkSlot: { width: 18, alignItems: 'center' },
-  guideTitle: { marginBottom: space[2] },
-  guideStep: { marginBottom: space[1] },
+  subSection: { marginTop: space[6] },
   footnote: { marginTop: space[2], marginHorizontal: space[4] },
+  pillBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space[2],
+    minHeight: 48,
+  },
+  actionSplit: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 48,
+  },
+  actionCell: {
+    flex: 1,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionDivider: {
+    width: StyleSheet.hairlineWidth,
+    height: 24,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[3],
+    paddingHorizontal: space[4],
+    minHeight: 52,
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    paddingVertical: 10,
+  },
+  footerLinkRow: {
+    marginTop: space[2],
+    marginHorizontal: space[4],
+  },
+  linkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    minHeight: 32,
+  },
+  preferenceBlock: {
+    paddingHorizontal: space[4],
+    paddingVertical: space[3],
+    gap: space[2],
+  },
+  preferenceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  segmentedTrack: {
+    flexDirection: 'row',
+    borderRadius: radius.sm,
+    padding: 3,
+    gap: 3,
+  },
+  segmentTab: {
+    flex: 1,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.sm - 2,
+  },
+  segmentTabActive: {
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
+  },
+  sheetBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+  },
+  sheetModal: {
+    borderTopLeftRadius: radius.group,
+    borderTopRightRadius: radius.group,
+    paddingHorizontal: space[4],
+    paddingTop: space[2],
+  },
+  sheetGrabber: {
+    width: 36,
+    height: 5,
+    borderRadius: 2.5,
+    alignSelf: 'center',
+    marginBottom: space[2],
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: space[2],
+    marginBottom: space[1],
+  },
+  modelList: {
+    flexGrow: 0,
+  },
+  modelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: space[3],
+    minHeight: 52,
+  },
+  modelBody: {
+    flex: 1,
+    marginRight: space[2],
+  },
+  modelUnavailable: {
+    opacity: 0.4,
+  },
 })

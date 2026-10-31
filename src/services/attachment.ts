@@ -1,6 +1,6 @@
 import * as ImagePicker from 'expo-image-picker'
 
-import { persistPhoto, readPhotoBase64 } from '@/storage/photos'
+import { persistPhoto, readPhotoBase64, resolvePhotoUri } from '@/storage/photos'
 
 /**
  * A photo staged for a chat message. `fileName` is the persisted reference (file name on
@@ -52,7 +52,7 @@ export async function captureAttachment(source: AttachmentSource): Promise<Attac
   // Web's picker can omit base64; fall back to reading the persisted copy.
   const base64 = asset.base64 ?? await readPhotoBase64(fileName)
   if (base64.length > MAX_BASE64_CHARS) throw new AttachmentError('That photo is too large to send. Try taking it again at a lower resolution.')
-  return { fileName, mimeType, uri: asset.uri, base64 }
+  return { fileName, mimeType, uri: resolvePhotoUri(fileName), base64 }
 }
 
 const MIME_BY_EXTENSION: Record<string, string> = {

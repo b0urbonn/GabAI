@@ -13,15 +13,17 @@ type ScreenProps = {
   bottomSpace?: number
   scroll?: boolean
   contentStyle?: StyleProp<ViewStyle>
+  /** Pass a `<RefreshControl>` for pull-to-refresh. Only used when `scroll` is true. */
+  refreshControl?: React.ReactElement
 }
 
-export function Screen({ children, topInset = false, bottomSpace = space[8], scroll = true, contentStyle }: ScreenProps) {
+export function Screen({ children, topInset = false, bottomSpace = space[8], scroll = true, contentStyle, refreshControl }: ScreenProps) {
   const { colors } = useTheme()
   const insets = useSafeAreaInsets()
   const padding = [styles.content, { paddingTop: space[6] + (topInset ? insets.top : 0), paddingBottom: bottomSpace + (topInset ? insets.bottom : 0) }, contentStyle]
   if (!scroll) return <View style={[styles.fill, { backgroundColor: colors.background }, padding]}>{children}</View>
   return (
-    <ScrollView style={[styles.fill, { backgroundColor: colors.background }]} contentContainerStyle={padding} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+    <ScrollView style={[styles.fill, { backgroundColor: colors.background }]} contentContainerStyle={padding} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" refreshControl={refreshControl}>
       {children}
     </ScrollView>
   )

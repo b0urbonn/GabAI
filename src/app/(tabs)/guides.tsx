@@ -4,6 +4,7 @@ import { StyleSheet, TextInput, View } from 'react-native'
 
 import { FAB_CLEARANCE } from '@/components/EmergencyFab'
 import { AppText } from '@/components/ui/AppText'
+import { FadeIn } from '@/components/ui/FadeIn'
 import { Icon } from '@/components/ui/Icon'
 import { IconTile } from '@/components/ui/IconTile'
 import { GroupedCard } from '@/components/ui/GroupedCard'
@@ -40,6 +41,7 @@ export default function GuidesScreen() {
 
   return (
     <Screen bottomSpace={FAB_CLEARANCE}>
+      <FadeIn>
       <PageHeader title="Guides" subtitle="Preparedness and first aid, organized for quick reference." />
 
       <View style={[styles.search, { backgroundColor: colors.surface, borderColor: colors.line }]}>
@@ -72,14 +74,16 @@ export default function GuidesScreen() {
           )
         })}
       </View>
+      </FadeIn>
 
       <View style={styles.results}>
-        {sections.map((section) => {
+        {sections.map((section, sectionIndex) => {
           const items = results.filter((guide) => guide.kind === section.kind)
           if (!items.length) return null
 
           return (
-            <View key={section.kind} style={styles.section}>
+            <FadeIn key={section.kind} delay={100 + sectionIndex * 90}>
+            <View style={styles.section}>
               <AppText variant="eyebrow" tone="soft" style={styles.sectionTitle}>{section.title}</AppText>
               <GroupedCard>
                 {items.map((guide) => (
@@ -94,6 +98,7 @@ export default function GuidesScreen() {
                 ))}
               </GroupedCard>
             </View>
+            </FadeIn>
           )
         })}
         {!results.length ? (

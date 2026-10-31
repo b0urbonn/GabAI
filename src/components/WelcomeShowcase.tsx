@@ -1,7 +1,6 @@
 import { StatusBar } from 'expo-status-bar'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  AccessibilityInfo,
   Animated,
   Easing,
   Image,
@@ -15,6 +14,7 @@ import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-nat
 
 import { AppText } from '@/components/ui/AppText'
 import { Touchable } from '@/components/ui/Touchable'
+import { useReduceMotion } from '@/hooks/useReduceMotion'
 import { brand, palette, radius, space, typeRamp } from '@/theme/tokens'
 import { useTheme } from '@/theme/useTheme'
 
@@ -80,7 +80,7 @@ export function WelcomeShowcase({ onGetStarted }: WelcomeShowcaseProps) {
     active: 0,
     previous: null,
   })
-  const [reduceMotion, setReduceMotion] = useState(false)
+  const reduceMotion = useReduceMotion()
 
   const [opacities] = useState(() =>
     DRM_SLIDES.map((_, index) => new Animated.Value(index === 0 ? 1 : 0)),
@@ -93,25 +93,8 @@ export function WelcomeShowcase({ onGetStarted }: WelcomeShowcaseProps) {
   const reduceMotionRef = useRef(false)
 
   useEffect(() => {
-    let mounted = true
-    AccessibilityInfo.isReduceMotionEnabled()
-      .then((enabled) => {
-        if (!mounted) return
-        reduceMotionRef.current = enabled
-        setReduceMotion(enabled)
-      })
-      .catch(() => {})
-
-    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', (enabled) => {
-      reduceMotionRef.current = enabled
-      setReduceMotion(enabled)
-    })
-
-    return () => {
-      mounted = false
-      subscription.remove()
-    }
-  }, [])
+    reduceMotionRef.current = reduceMotion
+  }, [reduceMotion])
 
   useEffect(() => {
     if (reduceMotion) {

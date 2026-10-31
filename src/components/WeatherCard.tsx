@@ -1,3 +1,4 @@
+import { useSQLiteContext } from 'expo-sqlite'
 import { useEffect, useState } from 'react'
 import { ActivityIndicator, Image, Modal, ScrollView, StyleSheet, View } from 'react-native'
 
@@ -6,35 +7,30 @@ import { Icon } from '@/components/ui/Icon'
 import { Touchable } from '@/components/ui/Touchable'
 import { weatherArtwork } from '@/data/weatherArtwork'
 import { conditionFor } from '@/data/weatherConditions'
+import {
+  readWeatherCache,
+  writeCurrentWeather,
+  writeForecastCache,
+  type WeatherForecastDay,
+  type WeatherLocation,
+  type WeatherReport,
+} from '@/db/weatherCache'
+import { getCurrentBarangay } from '@/services/location'
 import { radius, space, touchTarget } from '@/theme/tokens'
 import { useTheme } from '@/theme/useTheme'
 
-type WeatherReport = {
-  temperature: number
-  feelsLike: number
-  code: number
-  time: string
-  isDay: boolean
-}
-
-type WeatherForecastDay = {
-  date: string
-  dateLabel: string
-  low: number
-  high: number
-  precipitationChance: number | null
-  humidity: number | null
-  wind: number | null
-  visibility: number | null
-  code: number
-}
-
 function parseWeatherPayload(payload: unknown): WeatherReport {
-  const current = (payload as { current?: Record<string, unknown> } | null)?.current
+  const data = payload as { current?: Record<string, unknown>; daily?: Record<string, unknown> } | null
+  const current = data?.current
+  const daily = data?.daily
   const number = (field: string) => {
     const value = current?.[field]
     if (typeof value !== 'number' || !Number.isFinite(value)) throw new Error('Weather report unavailable')
     return value
+  }
+  const today = (field: string): number | null => {
+    const value = Array.isArray(daily?.[field]) ? (daily[field] as unknown[])[0] : null
+    return typeof value === 'number' && Number.isFinite(value) ? value : null
   }
   const time = current?.time
   if (typeof time !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?$/.test(time)) {
@@ -46,6 +42,9 @@ function parseWeatherPayload(payload: unknown): WeatherReport {
     code: number('weather_code'),
     time,
     isDay: number('is_day') === 1,
+    high: today('temperature_2m_max'),
+    low: today('temperature_2m_min'),
+    precipitationChance: today('precipitation_probability_max'),
   }
 }
 
@@ -117,12 +116,26 @@ function manilaDate(daysFromToday = 0): string {
   return new Date(Date.now() + 8 * 60 * 60 * 1000 + daysFromToday * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
 }
 
+const DEFAULT_LOCATION: WeatherLocation = { label: 'Boac, Marinduque', latitude: 13.4463, longitude: 121.8395 }
+
+/** Nearest barangay for the weather pin; Boac town when GPS is denied, unavailable, or off-island. */
+async function weatherLocation(): Promise<WeatherLocation> {
+  const lookup = await getCurrentBarangay()
+  if (lookup.status !== 'ok') return DEFAULT_LOCATION
+  return {
+    label: `${lookup.barangay.barangay}, ${lookup.barangay.municipality}`,
+    latitude: lookup.barangay.lat,
+    longitude: lookup.barangay.lng,
+  }
+}
+
 function displayMetric(value: number | null, unit: string, digits = 0): string {
   return value === null ? '—' : `${digits ? value.toFixed(digits) : Math.round(value)}${unit}`
 }
 
 export function WeatherCard() {
-  const { colors, scale } = useTheme()
+  const { colors, scale, scheme } = useTheme()
+  const db = useSQLiteContext()
   const [report, setReport] = useState<WeatherReport | null>(null)
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
@@ -134,18 +147,49 @@ export function WeatherCard() {
   const [forecastLoading, setForecastLoading] = useState(false)
   const [forecastFailed, setForecastFailed] = useState(false)
   const [forecast, setForecast] = useState<WeatherForecastDay[]>([])
+  const [geo, setGeo] = useState<WeatherLocation>(DEFAULT_LOCATION)
 
   const refreshWeather = () => {
     setLoading(true)
     setRefresh((value) => value + 1)
   }
 
-  const openForecast = () => {
+  const requestForecast = () => {
     setForecastLoading(true)
     setForecastFailed(false)
     setForecastRefresh((value) => value + 1)
+  }
+
+  const openForecast = () => {
+    requestForecast()
     setForecastOpen(true)
   }
+
+  const refreshForecast = () => {
+    refreshWeather()
+    requestForecast()
+  }
+
+  useEffect(() => {
+    let active = true
+    const hydrate = async () => {
+      try {
+        const cache = await readWeatherCache(db)
+        if (!active) return
+        if (cache.current) {
+          setReport((prev) => prev ?? cache.current?.report ?? null)
+          setUpdatedAt((prev) => prev ?? cache.current?.updatedAt ?? null)
+          setGeo((prev) => (prev === DEFAULT_LOCATION ? cache.current?.geo ?? prev : prev))
+          setNow(Date.now())
+        }
+        if (cache.forecast) setForecast((prev) => (prev.length ? prev : cache.forecast?.days ?? prev))
+      } catch {
+        // A missing or unreadable cache just means the usual "Checking the weather…" state.
+      }
+    }
+    void hydrate()
+    return () => { active = false }
+  }, [db])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -153,15 +197,20 @@ export function WeatherCard() {
     const timeout = setTimeout(() => controller.abort(), 10000)
     const load = async () => {
       try {
-        const url = 'https://api.open-meteo.com/v1/forecast?latitude=13.4463&longitude=121.8395&current=temperature_2m,apparent_temperature,is_day,weather_code&timezone=Asia%2FManila'
+        const place = await weatherLocation()
+        if (!active) return
+        setGeo((prev) => (prev.latitude === place.latitude && prev.longitude === place.longitude ? prev : place))
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&current=temperature_2m,apparent_temperature,is_day,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=1&timezone=Asia%2FManila`
         const response = await fetch(url, { signal: controller.signal })
         if (!response.ok) throw new Error('Weather unavailable')
         const next = parseWeatherPayload(await response.json() as unknown)
         if (active) {
+          const fetchedAt = Date.now()
           setReport(next)
-          setUpdatedAt(Date.now())
-          setNow(Date.now())
+          setUpdatedAt(fetchedAt)
+          setNow(fetchedAt)
           setFailed(false)
+          void writeCurrentWeather(db, { report: next, updatedAt: fetchedAt, geo: place }).catch(() => {})
         }
       } catch {
         if (active) setFailed(true)
@@ -183,7 +232,7 @@ export function WeatherCard() {
       clearInterval(nextUpdate)
       clearInterval(ageUpdate)
     }
-  }, [refresh])
+  }, [refresh, db])
 
   useEffect(() => {
     if (!forecastOpen) return
@@ -192,13 +241,14 @@ export function WeatherCard() {
     const timeout = setTimeout(() => controller.abort(), 12000)
     const loadForecast = async () => {
       try {
-        const url = 'https://api.open-meteo.com/v1/forecast?latitude=13.4463&longitude=121.8395&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max&hourly=relative_humidity_2m,visibility&forecast_days=7&timezone=Asia%2FManila'
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${geo.latitude}&longitude=${geo.longitude}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max&hourly=relative_humidity_2m,visibility&forecast_days=7&timezone=Asia%2FManila`
         const response = await fetch(url, { signal: controller.signal })
         if (!response.ok) throw new Error('Weather forecast unavailable')
         const records = parseForecastPayload(await response.json() as unknown)
         if (active) {
           setForecast(records)
           setForecastFailed(records.length === 0)
+          if (records.length) void writeForecastCache(db, { days: records, fetchedAt: Date.now(), geo }).catch(() => {})
         }
       } catch {
         if (active) setForecastFailed(true)
@@ -213,29 +263,32 @@ export function WeatherCard() {
       controller.abort()
       clearTimeout(timeout)
     }
-  }, [forecastOpen, forecastRefresh])
+  }, [forecastOpen, forecastRefresh, geo, db])
 
   const condition = report ? conditionFor(report.code, report.isDay) : null
   const artwork = condition?.background ? weatherArtwork[condition.background] : null
   const age = updatedAt ? Math.max(0, Math.floor((now - updatedAt) / 60000)) : null
   const status = loading ? 'Updating…' : failed ? 'Update unavailable' : age === null ? 'Not updated' : age ? `Updated ${age} min ago` : 'Updated just now'
+  const scrim = scheme === 'dark' ? 'rgba(0, 0, 0, 0.45)' : 'rgba(255, 255, 255, 0.55)'
+  const frosted = scheme === 'dark' ? 'rgba(255, 255, 255, 0.14)' : 'rgba(255, 255, 255, 0.78)'
 
   return (
     <>
-      <View accessibilityLabel="Weather in Boac, Marinduque" accessibilityState={{ busy: loading }} style={[styles.card, { backgroundColor: colors.surface }]}>
+      <View accessibilityLabel={`Weather in ${geo.label}`} accessibilityState={{ busy: loading }} style={[styles.card, { backgroundColor: colors.surface }]}>
         {artwork ? (
           <Image
             source={artwork}
             resizeMode="cover"
             accessible={false}
             pointerEvents="none"
-            style={[StyleSheet.absoluteFill, styles.artwork]}
+            style={StyleSheet.absoluteFill}
           />
         ) : null}
+        {artwork ? <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: scrim }]} /> : null}
         <View style={styles.header}>
           <View style={styles.location}>
             <Icon name="pin" size={15} color={colors.inkSoft} />
-            <AppText variant="caption" weight="600">Boac, Marinduque</AppText>
+            <AppText variant="caption" weight="600">{geo.label}</AppText>
           </View>
           <View style={styles.actions}>
             <AppText variant="small" tone="soft">{status}</AppText>
@@ -252,12 +305,31 @@ export function WeatherCard() {
               {report ? <AppText style={[styles.degree, { fontSize: 26 * scale }]}>°C</AppText> : null}
             </View>
             <AppText variant="bodyStrong" style={styles.condition}>{condition?.label ?? (loading ? 'Checking the weather…' : 'Weather unavailable')}</AppText>
-            <AppText variant="caption" tone="soft">{report ? `Feels like ${Math.round(report.feelsLike)}°C` : 'Internet needed for weather updates'}</AppText>
+            {report ? <AppText variant="caption" tone="soft">Feels like {Math.round(report.feelsLike)}°C</AppText> : null}
           </View>
-          <View style={styles.visual}>
-            <Icon name={condition?.icon ?? 'cloud'} size={48} color={colors.weatherAccent} />
+          <View style={[styles.iconBadge, { backgroundColor: frosted }]}>
+            <Icon name={condition?.icon ?? 'cloud'} size={30} color={colors.weatherAccent} />
           </View>
         </View>
+
+        {report ? (
+          <View style={styles.chips}>
+            {report.high !== null && report.low !== null ? (
+              <View style={[styles.chip, { backgroundColor: frosted }]}>
+                <Icon name="chart" size={13} color={colors.weatherDetailInk} />
+                <AppText variant="small" weight="600" style={{ color: colors.weatherDetailInk }}>{Math.round(report.high)}° / {Math.round(report.low)}°</AppText>
+              </View>
+            ) : null}
+            {report.precipitationChance !== null ? (
+              <View style={[styles.chip, { backgroundColor: frosted }]}>
+                <Icon name="rain" size={13} color={colors.weatherDetailInk} />
+                <AppText variant="small" weight="600" style={{ color: colors.weatherDetailInk }}>{Math.round(report.precipitationChance)}% rain today</AppText>
+              </View>
+            ) : null}
+          </View>
+        ) : (
+          <AppText variant="caption" tone="soft" style={styles.offlineNote}>Internet needed for weather updates</AppText>
+        )}
 
         <Touchable
           onPress={openForecast}
@@ -285,8 +357,15 @@ export function WeatherCard() {
             <View style={styles.sheetHeader}>
               <View style={styles.sheetHeading}>
                 <AppText variant="sectionTitle">7-day forecast</AppText>
-                <AppText variant="small" tone="soft">Boac, Marinduque · Today and the days ahead</AppText>
+                <AppText variant="small" tone="soft">{geo.label} · Today and the days ahead</AppText>
               </View>
+              <Touchable
+                onPress={refreshForecast}
+                accessibilityLabel="Refresh forecast and location"
+                style={[styles.closeButton, { backgroundColor: colors.background }]}
+              >
+                <Icon name="restore" size={18} color={colors.ink} />
+              </Touchable>
               <Touchable
                 onPress={() => setForecastOpen(false)}
                 accessibilityLabel="Close weather forecast"
@@ -296,12 +375,12 @@ export function WeatherCard() {
               </Touchable>
             </View>
 
-            {forecastLoading ? (
+            {forecastLoading && forecast.length === 0 ? (
               <View style={styles.forecastMessage}>
                 <ActivityIndicator color={colors.teal} />
                 <AppText variant="caption" tone="soft">Loading forecast…</AppText>
               </View>
-            ) : forecastFailed ? (
+            ) : forecastFailed && forecast.length === 0 ? (
               <View style={styles.forecastMessage}>
                 <Icon name="cloud" size={28} color={colors.inkSoft} />
                 <AppText variant="caption" tone="soft" align="center">The forecast is unavailable right now. Check your connection and try again.</AppText>
@@ -358,7 +437,6 @@ function ForecastMetric({ label, value }: { label: string; value: string }) {
 
 const styles = StyleSheet.create({
   card: { overflow: 'hidden', borderRadius: radius.group, padding: space[4] },
-  artwork: { opacity: 0.2 },
   header: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: space[2] },
   location: { flexDirection: 'row', alignItems: 'center', gap: space[1] },
   actions: { flexDirection: 'row', alignItems: 'center', gap: space[1] },
@@ -369,7 +447,10 @@ const styles = StyleSheet.create({
   temperature: { fontWeight: '400', letterSpacing: -2, fontVariant: ['tabular-nums'] },
   degree: { marginTop: 5, marginLeft: space[1], letterSpacing: -0.5 },
   condition: { marginTop: space[1] },
-  visual: { flexShrink: 0, alignItems: 'center', justifyContent: 'center' },
+  iconBadge: { width: 56, height: 56, borderRadius: 28, flexShrink: 0, alignItems: 'center', justifyContent: 'center' },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2], paddingBottom: space[1] },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: radius.pill, paddingHorizontal: space[2] + 2, paddingVertical: 6 },
+  offlineNote: { paddingBottom: space[1] },
   forecastButton: { minHeight: touchTarget, flexDirection: 'row', alignItems: 'center', gap: space[2], borderTopWidth: StyleSheet.hairlineWidth, marginTop: space[2], paddingTop: space[2] },
   forecastButtonLabel: { flex: 1 },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.42)', alignItems: 'center', justifyContent: 'center', padding: space[5] },

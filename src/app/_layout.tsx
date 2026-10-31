@@ -107,7 +107,8 @@ function AppNavigator() {
             name="guide/[id]"
             options={{ presentation: 'formSheet', sheetGrabberVisible: true, sheetAllowedDetents: [0.75, 1], contentStyle: { backgroundColor: colors.surface } }}
           />
-          <Stack.Screen name="emergency" />
+          <Stack.Screen name="emergency" options={{ animation: 'slide_from_bottom' }} />
+          <Stack.Screen name="notifications" />
           <Stack.Screen name="settings" />
           <Stack.Screen name="chat-settings" />
           <Stack.Screen name="profile/[group]" />

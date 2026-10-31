@@ -13,12 +13,12 @@ export default function TabsLayout() {
       <Tabs
         backBehavior="history"
         tabBar={(props) => <TabBar {...props} />}
-        screenOptions={{ header: () => <AppHeader />, sceneStyle: { backgroundColor: colors.background }, tabBarHideOnKeyboard: true }}
+        screenOptions={{ header: () => <AppHeader />, sceneStyle: { backgroundColor: colors.background }, tabBarHideOnKeyboard: true, animation: 'fade' }}
       >
         <Tabs.Screen name="index" options={{ title: 'Home' }} />
         <Tabs.Screen name="guides" options={{ title: 'Guides' }} />
         <Tabs.Screen name="capture" options={{ title: 'Capture' }} />
-        <Tabs.Screen name="chat" options={{ title: 'AI Chatbot', headerShown: false }} />
+        <Tabs.Screen name="chat" options={{ title: 'GabAI', headerShown: false }} />
         <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
       </Tabs>
       <EmergencyFab />

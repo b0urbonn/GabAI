@@ -8,14 +8,17 @@ export type Appearance = (typeof APPEARANCES)[number]
 
 export const NICKNAME_MAX_LENGTH = 40
 
-export const AI_MODES = ['local', 'cloud', 'custom'] as const
+export const AI_MODES = ['local', 'cloud'] as const
 export type AiMode = (typeof AI_MODES)[number]
 
 export const REPLY_LENGTHS = ['short', 'detailed'] as const
 export type ReplyLength = (typeof REPLY_LENGTHS)[number]
 
-export const VOICE_LANGUAGES = ['fil-PH', 'en-US'] as const
+export const VOICE_LANGUAGES = ['auto', 'fil-PH', 'en-US'] as const
 export type VoiceLanguage = (typeof VOICE_LANGUAGES)[number]
+
+export const LOCAL_BACKENDS = ['auto', 'npu', 'gpu', 'cpu'] as const
+export type LocalBackend = (typeof LOCAL_BACKENDS)[number]
 
 export const AVATAR_TONES = ['teal', 'sky', 'blue', 'violet', 'rose', 'amber'] as const
 export type AvatarTone = (typeof AVATAR_TONES)[number]
@@ -32,7 +35,7 @@ export const ILLUSTRATED_AVATARS = [
 ] as const
 export type IllustratedAvatar = (typeof ILLUSTRATED_AVATARS)[number]
 
-export const AVATAR_PRESETS = ['auto', 'initials', ...ILLUSTRATED_AVATARS] as const
+export const AVATAR_PRESETS = ['auto', 'initials', 'micah', ...ILLUSTRATED_AVATARS] as const
 export type AvatarPreset = (typeof AVATAR_PRESETS)[number]
 
 export type Settings = {
@@ -42,14 +45,18 @@ export type Settings = {
   avatarPhoto: string
   avatarTone: AvatarTone
   avatarPreset: AvatarPreset
+  avatarSeed: string
   onboarded: boolean
   aiMode: AiMode
+  localBackend: LocalBackend
   localReplyLength: ReplyLength
   geminiModel: GeminiModelChoice
   backendUrl: string
   backendModel: string
   voiceReplies: boolean
   voiceLanguage: VoiceLanguage
+  voiceIdentifier: string
+  lastSeenUpdates: number
 }
 
 export const defaultSettings: Settings = {
@@ -58,15 +65,19 @@ export const defaultSettings: Settings = {
   nickname: '',
   avatarPhoto: '',
   avatarTone: 'teal',
-  avatarPreset: 'auto',
+  avatarPreset: 'micah',
+  avatarSeed: '',
   onboarded: false,
   aiMode: 'local',
+  localBackend: 'auto',
   localReplyLength: 'short',
   geminiModel: 'auto',
   backendUrl: '',
   backendModel: '',
   voiceReplies: false,
-  voiceLanguage: 'fil-PH',
+  voiceLanguage: 'auto',
+  voiceIdentifier: '',
+  lastSeenUpdates: 0,
 }
 
 export const isAppearance = (value: unknown): value is Appearance => APPEARANCES.includes(value as Appearance)
@@ -93,15 +104,22 @@ export async function readSettings(db: SQLiteDatabase): Promise<Settings> {
     nickname: typeof stored.nickname === 'string' ? stored.nickname.trim().slice(0, NICKNAME_MAX_LENGTH) : '',
     avatarPhoto: typeof stored.avatarPhoto === 'string' ? stored.avatarPhoto : '',
     avatarTone: isAvatarTone(stored.avatarTone) ? stored.avatarTone : defaultSettings.avatarTone,
-    avatarPreset: isAvatarPreset(stored.avatarPreset) ? stored.avatarPreset : defaultSettings.avatarPreset,
+    avatarPreset:
+      isAvatarPreset(stored.avatarPreset) && stored.avatarPreset !== 'auto'
+        ? stored.avatarPreset
+        : defaultSettings.avatarPreset,
+    avatarSeed: typeof stored.avatarSeed === 'string' ? stored.avatarSeed : '',
     onboarded: stored.onboarded === 'true',
     aiMode: isAiMode(stored.aiMode) ? stored.aiMode : defaultSettings.aiMode,
+    localBackend: LOCAL_BACKENDS.includes(stored.localBackend as LocalBackend) ? stored.localBackend as LocalBackend : defaultSettings.localBackend,
     localReplyLength: isReplyLength(stored.localReplyLength) ? stored.localReplyLength : defaultSettings.localReplyLength,
     geminiModel: isGeminiModelChoice(stored.geminiModel) ? stored.geminiModel : defaultSettings.geminiModel,
     backendUrl: typeof stored.backendUrl === 'string' ? stored.backendUrl.trim() : '',
     backendModel: typeof stored.backendModel === 'string' ? stored.backendModel.trim() : '',
     voiceReplies: stored.voiceReplies === 'true',
     voiceLanguage: isVoiceLanguage(stored.voiceLanguage) ? stored.voiceLanguage : defaultSettings.voiceLanguage,
+    voiceIdentifier: typeof stored.voiceIdentifier === 'string' ? stored.voiceIdentifier : '',
+    lastSeenUpdates: Number.isFinite(Number(stored.lastSeenUpdates)) ? Number(stored.lastSeenUpdates) : 0,
   }
 }
 

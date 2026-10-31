@@ -23,7 +23,6 @@ const RING_LENGTH = 2 * Math.PI * RING_RADIUS
 const SOURCES: Record<AiMode, { source: UsageSource; label: string; detail: string }> = {
   local: { source: 'local', label: 'Local AI', detail: 'Gemma 4 E2B' },
   cloud: { source: 'gemini', label: 'Cloud AI', detail: 'Google Gemini' },
-  custom: { source: 'custom', label: 'Custom backend', detail: 'Your own server' },
 }
 
 const EMPTY: Record<UsageSource, SourceUsage> = {

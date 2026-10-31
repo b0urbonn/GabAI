@@ -1,35 +1,19 @@
 import * as Haptics from 'expo-haptics'
 import { useEffect, useState } from 'react'
-import { AccessibilityInfo, Animated, Easing, Image, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native'
 
-import {
-  getAvatarPalette,
-  pickRandomAvatarCombo,
-  type RandomAvatarCombo,
-} from '@/components/avatarPalettes'
-import { IllustratedAvatarSvg } from '@/components/IllustratedAvatarSvg'
+import { getAvatarPalette } from '@/components/avatarPalettes'
+import { MicahAvatar, randomAvatarSeed } from '@/components/MicahAvatar'
 import { Icon } from '@/components/ui/Icon'
-import type { AvatarTone, IllustratedAvatar } from '@/db/settings'
+import { useReduceMotion } from '@/hooks/useReduceMotion'
+import type { AvatarTone } from '@/db/settings'
+import { useSettings } from '@/providers/SettingsProvider'
 import type { ColorScheme } from '@/theme/tokens'
 import { useTheme } from '@/theme/useTheme'
 
-export {
-  AVATAR_PALETTES,
-  ILLUSTRATED_AVATAR_META,
-  getAvatarPalette,
-  getAvatarPresetLabel,
-  getInitials,
-  pickRandomAvatarCombo,
-  type RandomAvatarCombo,
-  type TonePalette,
-} from '@/components/avatarPalettes'
-export { IllustratedAvatarSvg } from '@/components/IllustratedAvatarSvg'
-
 export type AvatarVisualSnapshot = {
   key: string
-  photoUri?: string
-  character?: IllustratedAvatar
-  initials?: string
+  micahSeed: string
   tone: AvatarTone
 }
 
@@ -37,14 +21,10 @@ function AvatarFrame({
   snapshot,
   size,
   scheme,
-  photoBorderColor,
-  onPhotoError,
 }: {
   snapshot: AvatarVisualSnapshot
   size: number
   scheme: ColorScheme
-  photoBorderColor: string
-  onPhotoError?: (uri: string) => void
 }) {
   const palette = getAvatarPalette(snapshot.tone, scheme)
 
@@ -57,37 +37,11 @@ function AvatarFrame({
           height: size,
           borderRadius: size / 2,
           backgroundColor: palette.bg,
-          borderColor: snapshot.photoUri ? photoBorderColor : palette.ring,
+          borderColor: palette.ring,
         },
       ]}
     >
-      {snapshot.photoUri ? (
-        <Image
-          source={{ uri: snapshot.photoUri }}
-          onError={() => snapshot.photoUri && onPhotoError?.(snapshot.photoUri)}
-          resizeMode="cover"
-          accessibilityIgnoresInvertColors
-          style={{ width: size, height: size, borderRadius: size / 2 }}
-        />
-      ) : snapshot.character ? (
-        <IllustratedAvatarSvg variant={snapshot.character} palette={palette} size={size} />
-      ) : snapshot.initials ? (
-        <Text
-          allowFontScaling={false}
-          style={[
-            styles.monogram,
-            {
-              color: palette.fg,
-              fontSize: Math.round(size * 0.36),
-              lineHeight: Math.round(size * 0.42),
-            },
-          ]}
-        >
-          {snapshot.initials}
-        </Text>
-      ) : (
-        <Icon name="profile" size={Math.round(size * 0.4)} color={palette.fg} />
-      )}
+      <MicahAvatar seed={snapshot.micahSeed} size={size} />
     </View>
   )
 }
@@ -100,16 +54,12 @@ export function AnimatedAvatarSurface({
   snapshot,
   size,
   scheme,
-  photoBorderColor,
-  onPhotoError,
 }: {
   snapshot: AvatarVisualSnapshot
   size: number
   scheme: ColorScheme
-  photoBorderColor: string
-  onPhotoError?: (uri: string) => void
 }) {
-  const [reduceMotion, setReduceMotion] = useState(false)
+  const reduceMotion = useReduceMotion()
   const [opacities] = useState(() => [new Animated.Value(1), new Animated.Value(0)] as const)
   const [scales] = useState(() => [new Animated.Value(1), new Animated.Value(0.92)] as const)
 
@@ -134,20 +84,6 @@ export function AnimatedAvatarSurface({
       transitionId: buffer.transitionId + 1,
     })
   }
-
-  useEffect(() => {
-    let mounted = true
-    AccessibilityInfo.isReduceMotionEnabled()
-      .then((enabled) => {
-        if (mounted) setReduceMotion(Boolean(enabled))
-      })
-      .catch(() => {})
-    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion)
-    return () => {
-      mounted = false
-      sub.remove()
-    }
-  }, [])
 
   useEffect(() => {
     if (buffer.transitionId === 0) return
@@ -215,13 +151,7 @@ export function AnimatedAvatarSurface({
               },
             ]}
           >
-            <AvatarFrame
-              snapshot={slotSnapshot}
-              size={size}
-              scheme={scheme}
-              photoBorderColor={photoBorderColor}
-              onPhotoError={onPhotoError}
-            />
+            <AvatarFrame snapshot={slotSnapshot} size={size} scheme={scheme} />
           </Animated.View>
         )
       })}
@@ -230,26 +160,17 @@ export function AnimatedAvatarSurface({
 }
 
 /**
- * Minimalist auto-randomizing avatar preview (no badges, no buttons).
- * Smoothly cycles through random illustrated characters and color palettes,
- * and hops to a fresh random look on tap.
+ * Interactive random avatar preview with tap-to-shuffle.
+ * Displays the user's micah avatar; tapping rolls a new seed saved to settings.
  */
 export function RandomAvatarPreview({ size = 104 }: { size?: number }) {
   const { colors, scheme } = useTheme()
-  const [combo, setCombo] = useState<RandomAvatarCombo>(() => pickRandomAvatarCombo())
-  const [seed, setSeed] = useState(0)
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCombo((prev) => pickRandomAvatarCombo(prev))
-    }, 2400)
-    return () => clearInterval(timer)
-  }, [seed])
+  const { settings, updateSettings } = useSettings()
+  const seed = settings.avatarSeed || 'gabai'
 
   const shuffle = () => {
     Haptics.selectionAsync().catch(() => {})
-    setCombo((prev) => pickRandomAvatarCombo(prev))
-    setSeed((current) => current + 1)
+    void updateSettings({ avatarSeed: randomAvatarSeed() })
   }
 
   const buttonSize = Math.max(32, Math.round(size * 0.32))
@@ -264,13 +185,12 @@ export function RandomAvatarPreview({ size = 104 }: { size?: number }) {
       >
         <AnimatedAvatarSurface
           snapshot={{
-            key: `char:${combo.avatar}:${combo.tone}`,
-            character: combo.avatar,
-            tone: combo.tone,
+            key: `micah:${seed}`,
+            micahSeed: seed,
+            tone: settings.avatarTone,
           }}
           size={size}
           scheme={scheme}
-          photoBorderColor={colors.line}
         />
       </Pressable>
 
@@ -303,10 +223,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1.5,
     overflow: 'hidden',
-  },
-  monogram: {
-    fontWeight: '700',
-    letterSpacing: -0.5,
   },
   shuffleButton: {
     position: 'absolute',

@@ -5,10 +5,10 @@ import Svg, { Circle, Path, Rect } from 'react-native-svg'
 export type IconName =
   | 'home' | 'book' | 'chat' | 'kit' | 'phone' | 'wifiOff' | 'search' | 'chevron' | 'shield'
   | 'storm' | 'flood' | 'landslide' | 'quake' | 'fire' | 'bleeding' | 'burn' | 'choking' | 'fracture'
-  | 'sun' | 'moon' | 'system' | 'send' | 'arrowLeft' | 'check' | 'profile' | 'heart' | 'settings'
+  | 'sun' | 'moon' | 'system' | 'send' | 'arrowLeft' | 'arrowUp' | 'check' | 'profile' | 'heart' | 'settings'
   | 'download' | 'restore' | 'trash' | 'camera' | 'image' | 'close' | 'calendar' | 'chevronDown'
   | 'cloud' | 'rain' | 'wind' | 'pin' | 'eye' | 'chart' | 'paperclip'
-  | 'shuffle' | 'sparkles' | 'edit' | 'mic' | 'stop' | 'speaker'
+  | 'shuffle' | 'sparkles' | 'edit' | 'mic' | 'stop' | 'speaker' | 'bell'
 
 /** Stroke icon set ported 1:1 from the web prototype (24×24 grid, 1.8 stroke). */
 const paths: Record<IconName, ReactNode> = {
@@ -35,6 +35,7 @@ const paths: Record<IconName, ReactNode> = {
   system: <><Rect x="3" y="4" width="18" height="13" rx="2"/><Path d="M8 21h8M12 17v4"/></>,
   send: <><Path d="m22 2-7 20-4-9-9-4Z"/><Path d="M22 2 11 13"/></>,
   arrowLeft: <><Path d="m15 18-6-6 6-6"/><Path d="M9 12h11"/></>,
+  arrowUp: <Path d="M12 19V5m-7 7 7-7 7 7"/>,
   check: <Path d="m5 12 4 4L19 6"/>,
   profile: <><Circle cx="12" cy="8" r="4"/><Path d="M4 21v-2a8 8 0 0 1 16 0v2"/></>,
   heart: <Path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/>,
@@ -60,6 +61,7 @@ const paths: Record<IconName, ReactNode> = {
   mic: <><Rect x="9" y="1" width="6" height="13" rx="3"/><Path d="M19 10v2a7 7 0 0 1-14 0v-2"/><Path d="M12 19v4M8 23h8"/></>,
   stop: <Rect x="7" y="7" width="10" height="10" rx="2.5"/>,
   speaker: <><Path d="M11 5 6 9H2v6h4l5 4V5Z"/><Path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></>,
+  bell: <><Path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><Path d="M13.73 21a2 2 0 0 1-3.46 0"/></>,
 }
 
 export function Icon({ name, size = 22, color }: { name: IconName; size?: number; color: ColorValue }) {
