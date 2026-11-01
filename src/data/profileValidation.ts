@@ -1,5 +1,5 @@
 import { BARANGAYS } from '@/data/barangays'
-import { BLOOD_TYPES, MUNICIPALITIES, type Municipality, type ProfileInfo } from '@/data/profile'
+import { BLOOD_TYPES, MUNICIPALITIES, PROVINCES, REGIONS, type Municipality, type ProfileInfo } from '@/data/profile'
 
 const NAME_PATTERN = /^[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ .'-]*$/
 const PHONE_PATTERN = /^(09\d{9}|\+639\d{9}|0\d{8,9})$/
@@ -44,11 +44,15 @@ export function validateField(key: string, value: string, draft: ProfileInfo): s
     }
     case 'birthday':
       return validateBirthday(text)
+    case 'region':
+      return (REGIONS as readonly string[]).includes(text) ? undefined : 'Choose a region from the list.'
+    case 'province':
+      return (PROVINCES as readonly string[]).includes(text) ? undefined : 'Choose a province from the list.'
     case 'municipality':
       return (MUNICIPALITIES as readonly string[]).includes(text) ? undefined : 'Choose a municipality from the list.'
     case 'barangay': {
       const municipality = draft.municipality
-      if (!municipality || !(MUNICIPALITIES as readonly string[]).includes(municipality)) return 'Choose a municipality first.'
+      if (!municipality || !(MUNICIPALITIES as readonly string[]).includes(municipality)) return 'Choose a city or municipality first.'
       return BARANGAYS[municipality as Municipality].includes(text) ? undefined : 'Choose a barangay from the list.'
     }
     case 'blood':

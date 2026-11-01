@@ -1,0 +1,53 @@
+# Everything from .gitignore, plus generated local-module build output
+# (.easignore replaces .gitignore for the EAS upload tarball)
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env*.local
+
+# typescript
+*.tsbuildinfo
+
+# generated native folders
+/ios
+/android
+
+# video project (Remotion)
+/video
+
+# local module build output (CMake/Gradle intermediates with local paths)
+modules/**/build/
+modules/**/.cxx/
+
+# misc generated artifacts
+/output/
+*.apk

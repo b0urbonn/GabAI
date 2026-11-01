@@ -63,7 +63,7 @@ const styles = StyleSheet.create({
   mineColumn: { alignItems: 'flex-end' },
   bubble: { borderRadius: radius.group, paddingHorizontal: space[3], paddingVertical: space[3] },
   mineBubble: { borderBottomRightRadius: 5 },
-  assistantBubble: { borderTopLeftRadius: 5 },
+  assistantBubble: { borderBottomLeftRadius: 5 },
   image: { width: 200, height: 200, borderRadius: radius.md },
   mediaGap: { marginBottom: space[2] },
   errorBlock: { marginTop: space[2], gap: space[2] },

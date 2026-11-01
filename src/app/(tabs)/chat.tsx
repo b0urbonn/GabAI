@@ -10,6 +10,7 @@ import { ContextRing } from '@/components/chat/ContextRing'
 import { MessageBubble } from '@/components/chat/MessageBubble'
 import { AppText } from '@/components/ui/AppText'
 import { Icon } from '@/components/ui/Icon'
+import { IconTile } from '@/components/ui/IconTile'
 import { Touchable } from '@/components/ui/Touchable'
 import { MUNICIPALITIES, type ProfileInfo } from '@/data/profile'
 import { addMessage, clearMessages, listMessages, updateMessage, type ChatMessage } from '@/db/chat'
@@ -384,13 +385,13 @@ export default function ChatScreen() {
     <KeyboardAvoidingView style={[styles.fill, { paddingBottom: insets.bottom }]} behavior={Platform.OS === 'web' ? undefined : 'padding'}>
       <View style={[styles.topBar, { paddingTop: insets.top, borderBottomColor: colors.line }]}>
         <Touchable onPress={() => router.navigate('/')} accessibilityLabel="Back to Home" style={styles.topAction}>
-          <Icon name="arrowLeft" size={21} color={colors.ink} />
+          <Icon name="arrowLeft" size={22} color={colors.teal} />
         </Touchable>
         <View style={[styles.headerAvatarContainer, { backgroundColor: colors.tealSoft }]}>
           <Image source={morionImage} style={styles.headerAvatar} resizeMode="cover" />
         </View>
         <View style={styles.headerText}>
-          <AppText variant="bodyStrong">AI Chat</AppText>
+          <AppText variant="bodyStrong">GabAI</AppText>
           <View style={styles.statusRow}>
             <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
             <AppText variant="small" tone="soft" numberOfLines={1}>{statusText}</AppText>
@@ -423,9 +424,15 @@ export default function ChatScreen() {
           <AppText variant="caption" tone="soft" align="center">Ask about first aid, disasters, or Marinduque emergency contacts.</AppText>
           <View style={styles.suggestions}>
             {SUGGESTIONS.map((suggestion) => (
-              <Touchable key={suggestion.label} onPress={() => setDraft(suggestion.prompt)} style={[styles.suggestion, { backgroundColor: colors.tealSoft, borderColor: colors.tealSoft }]}>
-                <Icon name={suggestion.icon} size={18} color={colors.teal} />
-                <AppText variant="small" style={styles.suggestionText}>{suggestion.label}</AppText>
+              <Touchable
+                key={suggestion.label}
+                onPress={() => setDraft(suggestion.prompt)}
+                pressedScale={0.97}
+                accessibilityLabel={suggestion.label}
+                style={[styles.suggestionCard, { backgroundColor: colors.surface }]}
+              >
+                <IconTile icon={suggestion.icon} tone="teal" size="sm" />
+                <AppText variant="small" weight="600" style={styles.suggestionText}>{suggestion.label}</AppText>
               </Touchable>
             ))}
           </View>
@@ -449,22 +456,24 @@ export default function ChatScreen() {
           )}
         />
       )}
-      <View style={[styles.quickActionsBar, { backgroundColor: colors.background, borderTopColor: colors.line }]}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickActionsContent}>
-          {QUICK_ACTIONS.map((action) => (
-            <Touchable
-              key={action.label}
-              onPress={() => void send(action.prompt)}
-              disabled={thinking}
-              style={[styles.quickActionChip, { backgroundColor: colors.surface, borderColor: colors.line }]}
-              accessibilityRole="button"
-              accessibilityLabel={action.prompt}
-            >
-              <AppText variant="small" weight="600">{action.label}</AppText>
-            </Touchable>
-          ))}
-        </ScrollView>
-      </View>
+      {messages.length > 0 ? (
+        <View style={[styles.quickActionsBar, { borderTopColor: colors.line }]}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickActionsContent}>
+            {QUICK_ACTIONS.map((action) => (
+              <Touchable
+                key={action.label}
+                onPress={() => void send(action.prompt)}
+                disabled={thinking}
+                style={[styles.quickActionChip, { backgroundColor: colors.tealSoft }]}
+                accessibilityRole="button"
+                accessibilityLabel={action.prompt}
+              >
+                <AppText variant="small" weight="600" style={{ color: colors.tealDark }}>{action.label}</AppText>
+              </Touchable>
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
       <ChatInput
         value={draft}
         onChange={setDraft}
@@ -495,11 +504,11 @@ export default function ChatScreen() {
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  topBar: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: space[1], paddingHorizontal: space[2], paddingBottom: space[1], borderBottomWidth: StyleSheet.hairlineWidth },
+  topBar: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: space[2], paddingHorizontal: space[2], paddingBottom: space[1], borderBottomWidth: StyleSheet.hairlineWidth },
   headerText: { flex: 1, minWidth: 0 },
-  headerAvatarContainer: { width: 34, height: 34, borderRadius: 17, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', marginHorizontal: space[1] },
-  headerAvatar: { width: 34, height: 34 },
-  statusRow: { flexDirection: 'row', alignItems: 'center', gap: space[1] },
+  headerAvatarContainer: { width: 36, height: 36, borderRadius: 18, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  headerAvatar: { width: 36, height: 36 },
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: space[1], marginTop: 1 },
   statusDot: { width: 7, height: 7, borderRadius: 4 },
   topAction: { width: touchTarget, height: touchTarget, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md },
   list: { flexGrow: 1, paddingHorizontal: space[4], paddingVertical: space[3] },
@@ -507,13 +516,13 @@ const styles = StyleSheet.create({
   emptyMascotWrapper: { width: 110, height: 110, borderRadius: 55, alignItems: 'center', justifyContent: 'center', marginBottom: space[4], overflow: 'hidden' },
   emptyMascot: { width: 95, height: 105 },
   emptyTitle: { marginBottom: space[1] },
-  suggestions: { width: '100%', maxWidth: 480, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: space[2], marginTop: space[5] },
-  suggestion: { minHeight: touchTarget, flexDirection: 'row', alignItems: 'center', gap: space[2], borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: space[3], paddingVertical: space[2] },
-  suggestionText: { flexShrink: 1 },
+  suggestions: { width: '100%', maxWidth: 480, flexDirection: 'row', flexWrap: 'wrap', gap: space[2], marginTop: space[5] },
+  suggestionCard: { flexBasis: '47%', flexGrow: 1, borderRadius: radius.group, padding: space[3], gap: space[2] },
+  suggestionText: { lineHeight: 17 },
   notice: { paddingHorizontal: space[4], paddingTop: space[2] },
   setupBanner: { flexDirection: 'row', alignItems: 'center', gap: space[2], marginHorizontal: space[4], marginTop: space[2], padding: space[3], borderRadius: radius.md },
   setupText: { flex: 1 },
   quickActionsBar: { paddingVertical: space[1], borderTopWidth: StyleSheet.hairlineWidth },
   quickActionsContent: { gap: space[2], paddingHorizontal: space[3], alignItems: 'center' },
-  quickActionChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space[3], paddingVertical: 6, borderRadius: radius.pill, borderWidth: 1 },
+  quickActionChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space[3], paddingVertical: 6, borderRadius: radius.pill },
 })

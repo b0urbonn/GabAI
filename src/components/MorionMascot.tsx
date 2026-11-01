@@ -94,17 +94,14 @@ export function MorionMascot({ fps = 9, paused = false, style, resizeMode = 'con
 
   return (
     <View style={[style, { width, height, position: 'relative' }]}>
-      {/* Pre-cached frames: only the active frame is displayed, completely eliminating ghosting/leftover frames */}
+      {/* All frames stay mounted and decoded from the start — only opacity toggles, so there's no decode flicker or ghosting */}
       {MORION_FRAMES.map((src, i) => (
         <Image
           key={i}
           source={src}
           style={[
             styles.frame,
-            {
-              opacity: i === frameIndex ? 1 : 0,
-              display: i === frameIndex ? 'flex' : 'none',
-            },
+            { opacity: i === frameIndex ? 1 : 0 },
           ]}
           resizeMode={resizeMode}
           fadeDuration={0}

@@ -14,7 +14,7 @@
       }
     },
     "android": {
-      "versionCode": 3,
+      "versionCode": 5,
       "adaptiveIcon": {
         "backgroundColor": "#e8590c",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -64,7 +64,14 @@
           "microphonePermission": "GabAI uses the microphone to record voice messages for the assistant."
         }
       ],
-      "expo-build-properties",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "extraProguardRules": "-keep class com.google.ai.edge.litertlm.** { *; }\n-keep class com.google.ai.edge.litert.** { *; }"
+          }
+        }
+      ],
       "react-native-litert-lm",
       "expo-asset",
       "expo-image"

@@ -62,7 +62,7 @@ export function ChatInput({
               <Image source={{ uri: imageUri }} style={styles.thumbnail} />
               <View style={styles.flex}>
                 <AppText weight="600">Photo</AppText>
-                <AppText variant="small" tone="soft">Photo</AppText>
+                <AppText variant="small" tone="soft">Attached</AppText>
               </View>
               <Touchable onPress={onRemoveImage} accessibilityLabel="Remove photo" style={styles.remove}>
                 <Icon name="close" size={18} color={colors.inkSoft} />
@@ -118,16 +118,16 @@ export function ChatInput({
           </Touchable>
         ) : null}
         {recording ? (
-          <Touchable onPress={onStopRecording} accessibilityLabel="Use this recording" style={[styles.action, { backgroundColor: colors.teal }]}>
+          <Touchable onPress={onStopRecording} accessibilityLabel="Use this recording" hitSlop={4} style={[styles.action, { backgroundColor: colors.teal }]}>
             <Icon name="check" size={20} color={brand.onPrimary} />
           </Touchable>
         ) : generating ? (
-          <Touchable onPress={onStop} accessibilityLabel="Stop generating" style={[styles.action, { backgroundColor: colors.danger }]}>
-            <Icon name="stop" size={19} color={brand.onPrimary} />
+          <Touchable onPress={onStop} accessibilityLabel="Stop generating" hitSlop={4} style={[styles.action, { backgroundColor: colors.danger }]}>
+            <Icon name="stop" size={18} color={brand.onPrimary} />
           </Touchable>
         ) : (
-          <Touchable onPress={onSend} disabled={!canSend} accessibilityLabel="Send message" style={[styles.action, { backgroundColor: canSend ? brand.primary : colors.line }]}>
-          <Icon name="arrowUp" size={20} color={canSend ? brand.onPrimary : colors.inkSoft} />
+          <Touchable onPress={onSend} disabled={!canSend} accessibilityLabel="Send message" hitSlop={4} style={[styles.action, { backgroundColor: canSend ? brand.primary : colors.line }]}>
+            <Icon name="arrowUp" size={20} color={canSend ? brand.onPrimary : colors.inkSoft} />
           </Touchable>
         )}
       </View>
@@ -145,9 +145,9 @@ const styles = StyleSheet.create({
   audioTray: { alignSelf: 'flex-start' },
   row: { flexDirection: 'row', alignItems: 'flex-end', gap: space[1] },
   tool: { width: touchTarget, height: touchTarget, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill },
-  pill: { flex: 1, minHeight: 48, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: space[3], justifyContent: 'center' },
+  pill: { flex: 1, minHeight: 40, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: space[3], justifyContent: 'center' },
   input: { paddingVertical: space[2], paddingHorizontal: 0 },
-  action: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill },
+  action: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, marginBottom: 2 },
   remove: { width: touchTarget - 8, height: touchTarget - 8, alignItems: 'center', justifyContent: 'center' },
   recordingRow: { minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: space[2] },
   recordDot: { width: 9, height: 9, borderRadius: 5 },

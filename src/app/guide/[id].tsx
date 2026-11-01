@@ -10,7 +10,7 @@ import { FadeIn } from '@/components/ui/FadeIn'
 import { Icon } from '@/components/ui/Icon'
 import { IconTile } from '@/components/ui/IconTile'
 import { Touchable } from '@/components/ui/Touchable'
-import { getGuide } from '@/data/guides'
+import { getGuide, guideKindLabel } from '@/data/guides'
 import { getGuideArtwork } from '@/data/guideArtwork'
 import { radius, space, touchTarget } from '@/theme/tokens'
 import { useTheme } from '@/theme/useTheme'
@@ -40,7 +40,7 @@ export default function GuideSheet() {
       <View style={styles.header}>
         <IconTile icon={guide.icon} tone={guide.tone} />
         <View style={styles.flex}>
-          <AppText variant="eyebrow" tone="soft">{isAid ? 'First aid guide' : 'Safety guide'}</AppText>
+          <AppText variant="eyebrow" tone="soft">{guideKindLabel[guide.kind]}</AppText>
           <AppText variant="sheetTitle" accessibilityRole="header">{guide.name}</AppText>
         </View>
         <Touchable onPress={() => goBack('/guides')} accessibilityLabel="Close" style={[styles.close, { borderColor: colors.line, backgroundColor: colors.background }]}>
@@ -67,7 +67,7 @@ export default function GuideSheet() {
                   pressedScale={1}
                   accessibilityRole="tab"
                   accessibilityState={{ selected: active }}
-                  style={[styles.tab, active && { backgroundColor: colors.surface, shadowColor: '#000' }]}
+                  style={[styles.tab, active && [styles.tabActive, { backgroundColor: colors.surface }]]}
                 >
                   <AppText variant="small" weight="700" tone={active ? 'teal' : 'soft'} align="center">{item.label}</AppText>
                 </Touchable>
@@ -124,7 +124,8 @@ const styles = StyleSheet.create({
   illustration: { marginTop: space[4], borderRadius: radius.group, overflow: 'hidden' },
   illustrationCaption: { marginTop: space[2], marginHorizontal: space[1] },
   tabs: { flexDirection: 'row', gap: 2, marginTop: space[4], marginBottom: space[4], padding: 2, borderRadius: radius.md },
-  tab: { flex: 1, paddingVertical: space[2], minHeight: touchTarget - 4, justifyContent: 'center', borderRadius: radius.sm, shadowOpacity: 0.08, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
+  tab: { flex: 1, paddingVertical: space[2], minHeight: touchTarget - 4, justifyContent: 'center', borderRadius: radius.sm },
+  tabActive: { shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
   disasterSection: { marginTop: space[1], padding: space[3], borderRadius: radius.group },
   sectionHeading: { marginBottom: space[2] },
   steps: { gap: space[2] },

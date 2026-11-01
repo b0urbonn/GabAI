@@ -1,6 +1,6 @@
 import { router } from 'expo-router'
 import { useMemo, useState } from 'react'
-import { StyleSheet, TextInput, View } from 'react-native'
+import { Linking, StyleSheet, TextInput, View } from 'react-native'
 
 import { FAB_CLEARANCE } from '@/components/EmergencyFab'
 import { AppText } from '@/components/ui/AppText'
@@ -26,6 +26,11 @@ const sections: { title: string; kind: GuideKind }[] = [
   { title: 'Disaster preparedness', kind: 'disaster' },
   { title: 'First aid', kind: 'aid' },
 ]
+
+const CONTACT_EMAIL = 'mypxl.six@gmail.com'
+const REPO_URL = 'https://github.com/RUBYCHARLENE/Pixel6-GaBAI'
+const emailDevelopers = () => Linking.openURL(`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('GabAI contribution')}`)
+const openRepo = () => Linking.openURL(REPO_URL)
 
 export default function GuidesScreen() {
   const { colors, scale } = useTheme()
@@ -107,6 +112,26 @@ export default function GuidesScreen() {
             <AppText variant="caption" tone="soft" align="center">No guides match “{query.trim()}”. Try another search.</AppText>
           </View>
         ) : null}
+      </View>
+
+      <View style={styles.section}>
+        <AppText variant="eyebrow" tone="soft" style={styles.sectionTitle}>Contribute</AppText>
+        <GroupedCard>
+          <ListRow
+            title="Want to contribute?"
+            subtitle={`Email the developers — ${CONTACT_EMAIL}`}
+            leading="send"
+            onPress={emailDevelopers}
+            accessibilityLabel="Email the GabAI developers"
+          />
+          <ListRow
+            title="GitHub repository"
+            subtitle="Open source — view and contribute to the code"
+            leading="system"
+            onPress={openRepo}
+            accessibilityLabel="Open the GabAI GitHub repository"
+          />
+        </GroupedCard>
       </View>
 
       <Note>Guides are general learning content. Follow local authorities and seek professional care when needed.</Note>

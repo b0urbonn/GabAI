@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, TextInput, View } from 'react-native'
 import { DateField } from '@/components/DateField'
 import { SelectField } from '@/components/SelectField'
 import { AppText } from '@/components/ui/AppText'
-import { BLOOD_TYPES, MUNICIPALITIES, PROFILE_VALUE_MAX_LENGTH, type ProfileField } from '@/data/profile'
+import { BLOOD_TYPES, MUNICIPALITIES, PROFILE_VALUE_MAX_LENGTH, PROVINCES, REGIONS, type ProfileField } from '@/data/profile'
 import { space, typeRamp } from '@/theme/tokens'
 import { useTheme } from '@/theme/useTheme'
 
@@ -18,12 +18,19 @@ type ProfileFieldInputProps = {
 
 const WORD_CAPITALIZED_KEYS = new Set(['name', 'contactName', 'relationship'])
 
+const SELECT_OPTIONS: Record<string, readonly string[]> = {
+  region: REGIONS,
+  province: PROVINCES,
+  municipality: MUNICIPALITIES,
+  bloodType: BLOOD_TYPES,
+}
+
 /** iOS Inset Grouped editing cell: chromeless select sheet, date input, or text field. */
 export function ProfileFieldInput({ field, value, onChange, options, error }: ProfileFieldInputProps) {
   const { colors, scale } = useTheme()
   const inputRef = useRef<ComponentRef<typeof TextInput>>(null)
   const labelTone = error ? 'danger' : 'soft'
-  const isSelect = field.input === 'municipality' || field.input === 'bloodType' || field.input === 'barangay'
+  const isSelect = field.input === 'barangay' || (field.input != null && field.input in SELECT_OPTIONS)
 
   return (
     <View style={styles.row}>
@@ -34,12 +41,12 @@ export function ProfileFieldInput({ field, value, onChange, options, error }: Pr
           <AppText variant="small" weight="500" tone={labelTone}>{field.label}</AppText>
         </Pressable>
       )}
-      {field.input === 'municipality' || field.input === 'bloodType' ? (
+      {field.input != null && field.input in SELECT_OPTIONS ? (
         <SelectField
           label={field.label}
           value={value}
           placeholder={field.placeholder ?? 'Choose'}
-          options={field.input === 'municipality' ? MUNICIPALITIES : BLOOD_TYPES}
+          options={SELECT_OPTIONS[field.input]}
           onChange={onChange}
           error={!!error}
           variant="plain"
@@ -53,7 +60,7 @@ export function ProfileFieldInput({ field, value, onChange, options, error }: Pr
           options={options ?? []}
           onChange={onChange}
           disabled={!options?.length}
-          disabledHint="Choose a municipality first"
+          disabledHint="Choose a city or municipality first"
           error={!!error}
           variant="plain"
           allowClear

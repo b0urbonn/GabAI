@@ -3,7 +3,6 @@ import { useSQLiteContext } from 'expo-sqlite'
 import { useState } from 'react'
 import { Keyboard, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native'
 
-import { AddressField } from '@/components/AddressField'
 import { randomAvatarSeed } from '@/components/MicahAvatar'
 import { DetailsStep } from '@/components/onboarding/DetailsStep'
 import { FeatureStep, type FeatureSlide } from '@/components/onboarding/FeatureStep'
@@ -14,8 +13,10 @@ import { Button } from '@/components/ui/Button'
 import { GroupedCard } from '@/components/ui/GroupedCard'
 import { Banner } from '@/components/ui/Layout'
 import { Screen } from '@/components/ui/Screen'
+import { BARANGAYS } from '@/data/barangays'
 import {
   profileGroups,
+  type Municipality,
   type ProfileField,
   type ProfileGroup,
   type ProfileInfo,
@@ -30,22 +31,22 @@ const FEATURE_SLIDES: readonly FeatureSlide[] = [
     scene: 'disaster',
     category: 'Disaster Preparedness',
     title: 'Be Prepared. Stay Safe.',
-    subtitle: 'Practical checklists and local hazard guides ready anytime, even offline.',
+    subtitle: 'Guides with before, during, and after safety instructions — ready anytime, even offline.',
     imageLabel:
       'Marinduque Morion responder holding a disaster preparedness checklist with an emergency go-bag, water, and flashlight',
   },
   {
     scene: 'firstAid',
-    category: 'First Aid Assistance',
+    category: 'First Aid Guide',
     title: 'Know First Aid. Save Lives.',
-    subtitle: 'Clear, step-by-step emergency care guides when every second counts.',
+    subtitle: 'Step-by-step basic first aid for common emergency situations, even without internet.',
     imageLabel: 'Marinduque Morion responder performing CPR next to a first aid kit',
   },
   {
     scene: 'assistant',
-    category: 'Offline AI Assistant',
+    category: 'Offline-First AI Assistant',
     title: 'Your Safety Companion, Anytime.',
-    subtitle: 'Instant safety and first aid guidance whenever you need it — no internet required.',
+    subtitle: "On-device AI anyone can rely on when the unexpected hits and you don't know what's next.",
     imageLabel: 'Marinduque Morion responder consulting the offline GabAI assistant on a tablet',
   },
 ]
@@ -63,9 +64,11 @@ const healthGroup = profileGroups.find((group) => group.id === 'health')!
 const pickFields = (group: ProfileGroup, keys: string[]) =>
   keys.map((key): ProfileField => group.fields.find((field) => field.key === key)!)
 
-/** Personal page: name and phone as text cells, plus one combined Address (barangay + municipality) cell. */
+/** Personal page: name and phone as text cells, plus region → province → city → barangay selects. */
 const PERSONAL_TEXT_FIELDS = pickFields(personalGroup, ['name', 'phone'])
-const PERSONAL_KEYS = ['name', 'phone', 'municipality', 'barangay']
+const ADDRESS_SELECT_FIELDS = pickFields(personalGroup, ['region', 'province', 'municipality'])
+const BARANGAY_FIELD = pickFields(personalGroup, ['barangay'])[0]
+const PERSONAL_KEYS = ['name', 'phone', 'region', 'province', 'municipality', 'barangay']
 const HEALTH_FIELDS = healthGroup.fields
 const HEALTH_KEYS = HEALTH_FIELDS.map((field) => field.key)
 
@@ -90,6 +93,7 @@ export default function OnboardingScreen() {
 
   const updateField = (key: string, value: string) => {
     const next: ProfileInfo = { ...draft, [key]: value }
+    if (key === 'municipality' && value !== draft.municipality) next.barangay = ''
     setDraft(next)
     setErrors((current) => {
       const updated = { ...current }
@@ -98,13 +102,9 @@ export default function OnboardingScreen() {
         if (message) updated[key] = message
         else delete updated[key]
       }
+      if (key === 'municipality') delete updated.barangay
       return updated
     })
-  }
-
-  const updateAddress = ({ municipality, barangay }: { municipality: string; barangay: string }) => {
-    setDraft((current) => ({ ...current, municipality, barangay }))
-    setErrors(({ municipality: _m, barangay: _b, ...rest }) => rest)
   }
 
   /** Validates `keys`; returns false and highlights fields when any are invalid. */
@@ -124,7 +124,11 @@ export default function OnboardingScreen() {
 
   /** Skipping the personal page discards anything typed there, so it isn't saved later. */
   const skipPersonal = () => {
-    setDraft(({ name: _n, phone: _p, municipality: _m, barangay: _b, ...rest }) => rest)
+    setDraft((current) => {
+      const rest = { ...current }
+      for (const key of PERSONAL_KEYS) delete rest[key]
+      return rest
+    })
     setErrors({})
     goToStep(HEALTH_STEP)
   }
@@ -220,11 +224,21 @@ export default function OnboardingScreen() {
                   onChange={(value) => updateField(field.key, value)}
                 />
               ))}
-              <AddressField
-                municipality={draft.municipality ?? ''}
-                barangay={draft.barangay ?? ''}
-                error={errors.municipality ?? errors.barangay}
-                onChange={updateAddress}
+              {ADDRESS_SELECT_FIELDS.map((field) => (
+                <ProfileFieldInput
+                  key={field.key}
+                  field={field}
+                  value={draft[field.key] ?? ''}
+                  error={errors[field.key]}
+                  onChange={(value) => updateField(field.key, value)}
+                />
+              ))}
+              <ProfileFieldInput
+                field={BARANGAY_FIELD}
+                value={draft.barangay ?? ''}
+                error={errors.barangay}
+                options={BARANGAYS[draft.municipality as Municipality]}
+                onChange={(value) => updateField('barangay', value)}
               />
             </GroupedCard>
 

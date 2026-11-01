@@ -155,6 +155,7 @@ export default function SettingsScreen() {
         <SettingsLabel>GabAI</SettingsLabel>
         <GroupedCard>
           <ListRow title="Chatbot settings" subtitle="Local or cloud AI" leading="chat" onPress={() => router.push('/chat-settings')} />
+          <ListRow title="About GabAI" subtitle="The team behind the app" leading="sparkles" onPress={() => router.push('/about')} />
         </GroupedCard>
       </View>
       </FadeIn>

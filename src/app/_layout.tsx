@@ -111,6 +111,7 @@ function AppNavigator() {
           <Stack.Screen name="notifications" />
           <Stack.Screen name="settings" />
           <Stack.Screen name="chat-settings" />
+          <Stack.Screen name="about" />
           <Stack.Screen name="profile/[group]" />
         </Stack.Protected>
         <Stack.Protected guard={!settings.onboarded}>

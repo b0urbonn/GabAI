@@ -1,13 +1,15 @@
 import * as Haptics from 'expo-haptics'
+import { router } from 'expo-router'
 import type { BottomTabBarProps } from 'expo-router/js-tabs'
 import { useEffect, useState } from 'react'
-import { Animated, Easing, StyleSheet, View } from 'react-native'
+import { Alert, Animated, Easing, StyleSheet, View } from 'react-native'
 
 import { Icon, type IconName } from '@/components/ui/Icon'
 import { Touchable } from '@/components/ui/Touchable'
 import { useKeyboardVisible } from '@/hooks/useKeyboardVisible'
 import { useReduceMotion } from '@/hooks/useReduceMotion'
-import { brand, radius, space, touchTarget } from '@/theme/tokens'
+import { AttachmentError, captureAttachment, stageAttachment } from '@/services/attachment'
+import { brand, space, touchTarget } from '@/theme/tokens'
 import { useTheme } from '@/theme/useTheme'
 
 export const TAB_BAR_HEIGHT = 90
@@ -30,7 +32,7 @@ type TabItemProps = {
   onLongPress: () => void
 }
 
-/** One dock item: icon over an animated soft-teal indicator, or the raised center badge. */
+/** One dock item: icon tinted teal when active, or the raised center badge. */
 function TabItem({ label, icon, focused, prominent, onPress, onLongPress }: TabItemProps) {
   const { colors } = useTheme()
   const reduceMotion = useReduceMotion()
@@ -51,7 +53,7 @@ function TabItem({ label, icon, focused, prominent, onPress, onLongPress }: TabI
     return () => anim.stop()
   }, [focus, focused, reduceMotion])
 
-  const color = focused && !prominent ? brand.onPrimary : focused ? colors.teal : colors.inkSoft
+  const color = focused ? colors.teal : colors.inkSoft
   const pop = reduceMotion ? 1 : focus.interpolate({ inputRange: [0, 1], outputRange: [1, 1.1] })
 
   return (
@@ -78,21 +80,9 @@ function TabItem({ label, icon, focused, prominent, onPress, onLongPress }: TabI
           <Icon name={icon} size={30} color={brand.onPrimary} />
         </Animated.View>
       ) : (
-        <>
-          <Animated.View
-            style={[
-              styles.indicator,
-              {
-                backgroundColor: colors.teal,
-                opacity: focus,
-                transform: [{ scale: reduceMotion ? 1 : focus.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }],
-              },
-            ]}
-          />
-          <Animated.View style={[styles.iconSlot, { transform: [{ scale: pop }] }]}>
-            <Icon name={icon} size={28} color={color} />
-          </Animated.View>
-        </>
+        <Animated.View style={[styles.iconSlot, { transform: [{ scale: pop }] }]}>
+          <Icon name={icon} size={28} color={color} />
+        </Animated.View>
       )}
     </Touchable>
   )
@@ -123,7 +113,24 @@ export function TabBar({ state, descriptors, emitter, navigateToTab, insets }: B
         const focused = state.index === index
         const onPress = () => {
           const event = emitter.emit({ type: 'tabPress', target: route.key, canPreventDefault: true })
-          if (!focused && !event.defaultPrevented) {
+          if (event.defaultPrevented) return
+          // Capture opens the camera directly and hands the photo to the chat.
+          if (route.name === 'capture') {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {})
+            void (async () => {
+              try {
+                const attachment = await captureAttachment('camera')
+                if (attachment) {
+                  stageAttachment(attachment)
+                  router.push('/chat')
+                }
+              } catch (error) {
+                if (error instanceof AttachmentError) Alert.alert(error.message)
+              }
+            })()
+            return
+          }
+          if (!focused) {
             Haptics.selectionAsync().catch(() => {})
             navigateToTab(route.key)
           }
@@ -165,12 +172,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minWidth: 0,
     minHeight: touchTarget,
-  },
-  indicator: {
-    ...StyleSheet.absoluteFill,
-    marginHorizontal: 2,
-    marginVertical: 9,
-    borderRadius: radius.pill,
   },
   prominentBadge: {
     width: 68,

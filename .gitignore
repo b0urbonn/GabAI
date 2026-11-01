@@ -45,3 +45,8 @@ yarn-error.*
 
 # build artifacts
 *.apk
+*.apk.part
+
+# local Expo module build output
+modules/local-ai-device/android/.cxx/
+modules/local-ai-device/android/build/

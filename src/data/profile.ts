@@ -2,6 +2,8 @@ import type { KeyboardTypeOptions } from 'react-native'
 
 import type { IconName } from '@/components/ui/Icon'
 
+export const REGIONS = ['MIMAROPA'] as const
+export const PROVINCES = ['Marinduque'] as const
 export const MUNICIPALITIES = ['Boac', 'Buenavista', 'Gasan', 'Mogpog', 'Santa Cruz', 'Torrijos'] as const
 export type Municipality = (typeof MUNICIPALITIES)[number]
 
@@ -14,7 +16,7 @@ export type ProfileField = {
   label: string
   placeholder?: string
   keyboardType?: KeyboardTypeOptions
-  input?: 'text' | 'municipality' | 'barangay' | 'bloodType' | 'date' | 'phone'
+  input?: 'text' | 'region' | 'province' | 'municipality' | 'barangay' | 'bloodType' | 'date' | 'phone'
 }
 
 export type ProfileGroup = {
@@ -35,7 +37,9 @@ export const profileGroups: ProfileGroup[] = [
       { key: 'name', label: 'Full name', placeholder: 'Your full name' },
       { key: 'birthday', label: 'Date of birth', placeholder: 'YYYY-MM-DD', input: 'date' },
       { key: 'phone', label: 'Phone number', placeholder: 'e.g. 0917 123 4567', input: 'phone' },
-      { key: 'municipality', label: 'Municipality', placeholder: 'Choose your municipality', input: 'municipality' },
+      { key: 'region', label: 'Region', placeholder: 'Choose your region', input: 'region' },
+      { key: 'province', label: 'Province', placeholder: 'Choose your province', input: 'province' },
+      { key: 'municipality', label: 'City / Municipality', placeholder: 'Choose your city or municipality', input: 'municipality' },
       { key: 'barangay', label: 'Barangay', placeholder: 'Choose your barangay', input: 'barangay' },
     ],
   },

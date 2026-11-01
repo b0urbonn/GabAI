@@ -34,6 +34,9 @@ object LocalAudioDecoder {
       } ?: error("No audio track found")
       extractor.selectTrack(track)
       val format = extractor.getTrackFormat(track)
+      require(!format.containsKey(MediaFormat.KEY_DURATION) || format.getLong(MediaFormat.KEY_DURATION) <= 30_000_000) {
+        "Local AI supports voice messages up to 30 seconds. Record a shorter message or use Cloud AI."
+      }
       rate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
       channels = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
       format.setInteger(MediaFormat.KEY_PCM_ENCODING, AudioFormat.ENCODING_PCM_16BIT)
@@ -76,7 +79,11 @@ object LocalAudioDecoder {
               buffer.limit(info.offset + info.size)
               val bytes = ByteArray(info.size)
               buffer.get(bytes)
-              check(pcm.size() + bytes.size <= 64 * 1024 * 1024) { "Audio message is too long" }
+              val bytesPerSample = if (encoding == AudioFormat.ENCODING_PCM_FLOAT) 4 else 2
+              val maximumBytes = minOf(12 * 1024 * 1024L, rate.toLong() * channels * bytesPerSample * 30)
+              check(pcm.size().toLong() + bytes.size <= maximumBytes) {
+                "Local AI supports voice messages up to 30 seconds. Record a shorter message or use Cloud AI."
+              }
               pcm.write(bytes)
             }
             outputEnded = info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0
@@ -94,7 +101,7 @@ object LocalAudioDecoder {
     val source = ByteBuffer.wrap(pcm.toByteArray()).order(ByteOrder.LITTLE_ENDIAN)
     val frames = source.limit() / (bytesPerSample * channels)
     require(frames > 0) { "Audio recording is empty" }
-    val targetFrames = (frames.toLong() * 16000 / rate).coerceAtMost(16000 * 120L).toInt()
+    val targetFrames = (frames.toLong() * 16000 / rate).toInt()
     val output = ByteBuffer.allocate(targetFrames * 2).order(ByteOrder.LITTLE_ENDIAN)
     fun mono(frame: Int): Float {
       val offset = frame.coerceIn(0, frames - 1) * channels * bytesPerSample

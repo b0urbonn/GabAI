@@ -3,10 +3,15 @@ new file mode 100644
 index 0000000..b245b69
 --- /dev/null
 +++ b/node_modules/react-native-litert-lm/android/consumer-rules.pro
-@@ -0,0 +1,6 @@
+@@ -0,0 +1,11 @@
 +# Consumer ProGuard rules for react-native-litert-lm.
 +# The engine's HybridObjects are created through JNI — keep them if the app
 +# ever enables minification.
 +-keep class dev.litert.** { *; }
 +-keep class com.margelo.nitro.** { *; }
 +-keep class com.facebook.jni.** { *; }
++
++# LiteRT-LM resolves sampler getters and streaming callbacks by name in JNI.
++# R8 otherwise removes/renames them, aborting release builds with mid == null
++# in nativeCreateConversation (upstream LiteRT-LM issue #3739).
++-keep class com.google.ai.edge.litertlm.** { *; }

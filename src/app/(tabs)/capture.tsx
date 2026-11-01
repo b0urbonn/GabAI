@@ -15,7 +15,7 @@ import { Touchable } from '@/components/ui/Touchable'
 import { deletePhotoRow, insertPhoto, listPhotos, type Photo } from '@/db/photos'
 import { attachmentFromStored, stageAttachment, AttachmentError, type Attachment } from '@/services/attachment'
 import { deletePhotoFile, persistPhoto } from '@/storage/photos'
-import { brand, radius, space } from '@/theme/tokens'
+import { radius, space } from '@/theme/tokens'
 import { useTheme } from '@/theme/useTheme'
 import { confirmAction } from '@/utils/dialogs'
 
@@ -119,10 +119,9 @@ export default function CaptureScreen() {
     <Screen>
       <PageHeader title="Visual Assessment" subtitle="Capture a situation or damage for instant safety guidance." />
 
-      <FadeIn>
-      {/* Apple-style Camera Viewfinder */}
-      <View style={[styles.viewfinder, { backgroundColor: '#151518' }]}>
-        {pending ? (
+      {pending ? (
+        <FadeIn>
+        <View style={[styles.viewfinder, { backgroundColor: '#151518' }]}>
           <View style={styles.previewContainer}>
             <Image
               source={{ uri: pending.uri }}
@@ -148,38 +147,9 @@ export default function CaptureScreen() {
               </AppText>
             </View>
           </View>
-        ) : (
-          <Touchable
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
-              void pick('camera')
-            }}
-            pressedScale={0.99}
-            accessibilityRole="button"
-            accessibilityLabel="Tap to open camera"
-            style={styles.viewfinderTouchable}
-          >
-            <View style={styles.placeholder}>
-              <View style={styles.placeholderIcon}>
-                <Icon name="camera" size={32} color="#ffffff" />
-              </View>
-              <AppText variant="bodyStrong" style={styles.viewfinderTitle}>
-                Tap to Open Camera
-              </AppText>
-              <AppText variant="caption" style={styles.viewfinderSubtitle}>
-                Frame hazard, injury, or damage
-              </AppText>
-            </View>
-
-            {/* iOS Framing Reticle Brackets */}
-            <View style={styles.reticleTopLeft} />
-            <View style={styles.reticleTopRight} />
-            <View style={styles.reticleBottomLeft} />
-            <View style={styles.reticleBottomRight} />
-          </Touchable>
-        )}
-      </View>
-      </FadeIn>
+        </View>
+        </FadeIn>
+      ) : null}
 
       {error ? <Banner text={error} tone="error" /> : null}
 
@@ -215,90 +185,36 @@ export default function CaptureScreen() {
           </View>
         </View>
       ) : (
-        <View style={styles.cameraDock}>
-          {/* Photo Library Button */}
-          <View style={styles.dockItem}>
-            <Touchable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
-                void pick('library')
-              }}
-              pressedScale={0.92}
-              accessibilityLabel="Choose from photo library"
-              style={[
-                styles.dockSideButton,
-                { backgroundColor: colors.surface, borderColor: colors.line },
-              ]}
-            >
-              <Icon name="image" size={22} color={colors.ink} />
-            </Touchable>
-            <AppText variant="small" tone="soft" style={styles.dockLabel}>
-              Photos
-            </AppText>
-          </View>
-
-          {/* Central Apple Shutter Button */}
-          <View style={styles.dockItem}>
-            <Touchable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {})
-                void pick('camera')
-              }}
-              pressedScale={0.90}
-              accessibilityLabel="Take a photo"
-              accessibilityRole="button"
-              style={[styles.shutterOuter, { borderColor: colors.line }]}
-            >
-              <View style={[styles.shutterInner, { backgroundColor: colors.teal }]}>
-                <Icon name="camera" size={26} color={brand.onPrimary} />
-              </View>
-            </Touchable>
-            <AppText variant="caption" weight="600" style={styles.dockLabel}>
-              Take Photo
-            </AppText>
-          </View>
-
-          {/* Recent Thumbnail or Balanced Slot */}
-          <View style={styles.dockItem}>
-            {photos.length > 0 ? (
-              <Touchable
-                onPress={() => {
-                  Haptics.selectionAsync().catch(() => {})
-                  void analyzeSaved(photos[0])
-                }}
-                pressedScale={0.92}
-                accessibilityLabel="Analyze latest photo"
-                style={[
-                  styles.dockSideButton,
-                  { backgroundColor: colors.surface, borderColor: colors.line, overflow: 'hidden' },
-                ]}
-              >
-                <Image source={{ uri: photos[0].uri }} style={StyleSheet.absoluteFill} />
-                <View style={[styles.recentBadge, { backgroundColor: colors.teal }]}>
-                  <AppText variant="tab" weight="700" style={{ color: brand.onPrimary, fontSize: 9 }}>
-                    {photos.length}
-                  </AppText>
-                </View>
-              </Touchable>
-            ) : (
-              <View style={styles.dockSidePlaceholder} />
-            )}
-            <AppText variant="small" tone="soft" style={styles.dockLabel}>
-              {photos.length > 0 ? 'Recent' : ''}
-            </AppText>
-          </View>
+        <View style={styles.captureActions}>
+          <Button
+            label="Take a photo"
+            icon="camera"
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {})
+              void pick('camera')
+            }}
+          />
+          <Button
+            label="Choose from library"
+            icon="image"
+            variant="secondary"
+            onPress={() => {
+              Haptics.selectionAsync().catch(() => {})
+              void pick('library')
+            }}
+          />
         </View>
       )}
       </FadeIn>
 
       {/* Saved Photos Gallery */}
-      {photos.length > 0 && (
-        <FadeIn delay={180}>
-        <View style={styles.section}>
-          <SectionHeader
-            title="Recent Captures"
-            caption={`${photos.length} ${photos.length === 1 ? 'photo' : 'photos'} saved on device`}
-          />
+      <FadeIn delay={180}>
+      <View style={styles.section}>
+        <SectionHeader
+          title="Recent Captures"
+          caption={photos.length ? `${photos.length} ${photos.length === 1 ? 'photo' : 'photos'} saved on device` : 'Photos you save appear here'}
+        />
+        {photos.length ? (
           <View style={styles.grid}>
             {photos.map((photo) => {
               const taken = new Date(photo.createdAt).toLocaleString()
@@ -326,9 +242,16 @@ export default function CaptureScreen() {
               )
             })}
           </View>
-        </View>
-        </FadeIn>
-      )}
+        ) : (
+          <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.line }]}>
+            <Icon name="image" size={22} color={colors.inkSoft} />
+            <AppText variant="caption" tone="soft" align="center">
+              No captures yet — photos you save will appear here.
+            </AppText>
+          </View>
+        )}
+      </View>
+      </FadeIn>
 
       <Note icon="shield">
         Photos remain on this device and are only analyzed when you ask the chatbot.
@@ -347,11 +270,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-  },
-  viewfinderTouchable: {
-    ...StyleSheet.absoluteFill,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   previewContainer: {
     ...StyleSheet.absoluteFill,
@@ -382,134 +300,9 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: radius.pill,
   },
-  placeholder: {
-    alignItems: 'center',
-    padding: space[6],
-    gap: space[2],
-  },
-  placeholderIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: space[2],
-  },
-  viewfinderTitle: {
-    color: '#ffffff',
-  },
-  viewfinderSubtitle: {
-    color: 'rgba(255, 255, 255, 0.6)',
-  },
-  /* Reticle corner brackets */
-  reticleTopLeft: {
-    position: 'absolute',
-    top: 16,
-    left: 16,
-    width: 24,
-    height: 24,
-    borderTopWidth: 2.5,
-    borderLeftWidth: 2.5,
-    borderTopLeftRadius: 6,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
-  },
-  reticleTopRight: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    width: 24,
-    height: 24,
-    borderTopWidth: 2.5,
-    borderRightWidth: 2.5,
-    borderTopRightRadius: 6,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
-  },
-  reticleBottomLeft: {
-    position: 'absolute',
-    bottom: 16,
-    left: 16,
-    width: 24,
-    height: 24,
-    borderBottomWidth: 2.5,
-    borderLeftWidth: 2.5,
-    borderBottomLeftRadius: 6,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
-  },
-  reticleBottomRight: {
-    position: 'absolute',
-    bottom: 16,
-    right: 16,
-    width: 24,
-    height: 24,
-    borderBottomWidth: 2.5,
-    borderRightWidth: 2.5,
-    borderBottomRightRadius: 6,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
-  },
-  /* Apple Camera Control Dock */
-  cameraDock: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
+  captureActions: {
     marginTop: space[6],
-    paddingHorizontal: space[4],
-  },
-  dockItem: {
-    alignItems: 'center',
-    gap: space[2],
-    minWidth: 74,
-  },
-  dockLabel: {
-    textAlign: 'center',
-  },
-  shutterOuter: {
-    width: 74,
-    height: 74,
-    borderRadius: 37,
-    borderWidth: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 3,
-  },
-  shutterInner: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dockSideButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 1,
-  },
-  dockSidePlaceholder: {
-    width: 50,
-    height: 50,
-  },
-  recentBadge: {
-    position: 'absolute',
-    top: 2,
-    right: 2,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
+    gap: space[3],
   },
   /* Pending review actions */
   pendingActions: {
@@ -526,6 +319,15 @@ const styles = StyleSheet.create({
   /* Gallery */
   section: {
     marginTop: space[6],
+  },
+  emptyCard: {
+    minHeight: 110,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space[2],
+    padding: space[5],
+    borderWidth: 1,
+    borderRadius: radius.group,
   },
   grid: {
     flexDirection: 'row',

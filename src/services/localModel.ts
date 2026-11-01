@@ -80,12 +80,20 @@ let engineLoading: Promise<LiteRTLMInstance> | null = null
 const conversations = new Map<string, ConversationHandle>()
 const conversationPrompts = new Map<string, string>()
 
+// Loading, generation and teardown share native pointers. In particular, a
+// settings action must never unload an engine while a chat is still using it.
+let engineQueue: Promise<unknown> = Promise.resolve()
+function withEngine<T>(action: () => Promise<T>): Promise<T> {
+  const task = engineQueue.then(action)
+  engineQueue = task.catch(() => {})
+  return task
+}
+
 type DeviceReport = {
   compatible: boolean
-  memoryReady: boolean
-  recommendedBackend: Backend
-  npuDetected: boolean
-  gpuAvailable: boolean
+  availableMemoryBytes: number
+  lowMemory: boolean
+  candidates: Backend[]
 }
 
 type LocalAiDevice = {
@@ -93,11 +101,14 @@ type LocalAiDevice = {
     androidApi: number
     arm64: boolean
     totalRamBytes: number
+    availableRamBytes: number
+    lowMemory: boolean
     npuDetected: boolean
     gpuAvailable: boolean
     model?: string
   }>
   prepareAudio?: (uri: string) => Promise<string>
+  prepareImage?: (uri: string) => Promise<string>
 }
 
 function nativeDevice(): LocalAiDevice | null {
@@ -275,45 +286,63 @@ function filePath(uri: string) {
   return decodeURIComponent(uri.slice('file://'.length))
 }
 
-async function inspectDevice(): Promise<DeviceReport> {
-  const { estimateMemory } = localRuntime()
+async function inspectDevice(multimodal: boolean): Promise<DeviceReport> {
+  const runtime = localRuntime()
+  let device: DeviceReport
+  let gpuAvailable = true
   if (Platform.OS === 'android') {
     const report = await nativeDevice()?.scan?.()
     if (!report) throw new LocalModelUnavailableError('Update GabAI to enable local model hardware detection.')
-    const estimate = (backend: Backend) => estimateMemory({
-      modelFileSizeBytes: MODEL_FILE.size ?? LOCAL_MODEL.bytes,
-      availableMemoryBytes: report.totalRamBytes,
-      config: { backend, maxContextTokens: LOCAL_CONTEXT_TOKENS },
-    })
-    const preferred: Backend = report.npuDetected ? 'npu' : report.gpuAvailable ? 'gpu' : 'cpu'
-    return {
+    gpuAvailable = report.gpuAvailable
+    device = {
       compatible: report.arm64 && report.androidApi >= 26,
-      memoryReady: estimate('cpu').verdict !== 'critical',
-      recommendedBackend: estimate(preferred).verdict === 'critical' ? 'cpu' : preferred,
-      npuDetected: report.npuDetected,
-      gpuAvailable: report.gpuAvailable,
+      availableMemoryBytes: report.availableRamBytes,
+      lowMemory: report.lowMemory,
+      candidates: ['cpu'],
+    }
+  } else {
+    // totalMemory is the phone's RAM, not the app's remaining jetsam budget.
+    // A lightweight, unloaded instance can read the latter without parsing the model.
+    const probe = runtime.createLLM()
+    try {
+      const memory = probe.getMemoryUsage()
+      device = {
+        compatible: Platform.OS === 'ios' && Device.isDevice,
+        availableMemoryBytes: memory.availableMemoryBytes,
+        lowMemory: memory.isLowMemory,
+        candidates: ['cpu'],
+      }
+    } finally {
+      probe.close()
     }
   }
-  const totalMemory = Device.totalMemory ?? 0
-  const cpu = estimateMemory({
-    modelFileSizeBytes: MODEL_FILE.size ?? LOCAL_MODEL.bytes,
-    availableMemoryBytes: totalMemory,
-    config: { backend: 'cpu', maxContextTokens: LOCAL_CONTEXT_TOKENS },
-  })
-  return {
-    compatible: Platform.OS === 'ios' && Device.isDevice,
-    memoryReady: cpu.verdict !== 'critical',
-    recommendedBackend: Platform.OS === 'ios' ? 'gpu' : 'cpu',
-    npuDetected: false,
-    gpuAvailable: Platform.OS === 'ios',
-  }
+  if (!device.compatible) throw new LocalModelUnavailableError('Local AI requires a physical, supported device.')
+  // inspectModel itself reads the vision encoder and can allocate hundreds of
+  // MB. Refuse unsafe loads BEFORE that native call, not just before loadModel.
+  resolveBackend('cpu', device, multimodal)
+  const info = await runtime.inspectModel(MODEL_FILE.uri)
+  // An NNAPI accelerator does not mean this bundle was compiled for its NPU.
+  const recommendation = runtime.recommendBackend(info, { device: runtime.getDeviceInfo(), prefer: 'compatibility' })
+  if (!recommendation.compatible) throw new LocalModelUnavailableError(recommendation.reason)
+  device.candidates = recommendation.candidates.filter((candidate) => candidate !== 'gpu' || gpuAvailable)
+  return device
 }
 
-function resolveBackend(requested: LocalBackend, device: DeviceReport): Backend {
-  if (requested === 'auto') return device.recommendedBackend
-  if (requested === 'npu' && !device.npuDetected) return device.recommendedBackend
-  if (requested === 'gpu' && !device.gpuAvailable) return device.recommendedBackend
-  return requested
+function resolveBackend(requested: LocalBackend, device: DeviceReport, multimodal: boolean): Backend {
+  const candidates = requested !== 'auto' && device.candidates.includes(requested)
+    ? [requested, ...device.candidates.filter((candidate) => candidate !== requested)]
+    : device.candidates
+  // Leave room for Android, the UI, media decoding and encoder activations.
+  const reserve = (multimodal ? 1024 : 512) * 1024 * 1024
+  const selected = candidates.find((backend) => localRuntime().estimateMemory({
+    modelFileSizeBytes: MODEL_FILE.size ?? LOCAL_MODEL.bytes,
+    availableMemoryBytes: Math.max(0, device.availableMemoryBytes - reserve),
+    config: { backend, maxContextTokens: LOCAL_CONTEXT_TOKENS },
+  }).verdict !== 'critical')
+  if (!Number.isFinite(device.availableMemoryBytes) || device.lowMemory || !selected) {
+    throw new LocalModelUnavailableError(`Not enough free memory to load local AI${multimodal ? ' with photo and voice support' : ''}. Close other apps and try again, or use Cloud AI.`)
+  }
+  return selected
 }
 
 function friendlyLocalError(error: unknown) {
@@ -344,21 +373,23 @@ async function ensureEngine(backend: LocalBackend, system: string, multimodal: b
   // A multimodal engine answers text-only requests too, so once the encoders are
   // loaded they stay — upgrading (text-only engine, media request) is the only
   // reason to pay for a second full model load.
-  if (engine && engineBackend === backend && (engineMultimodal || !multimodal)) return engine
+  if (engine?.isReady() && engineBackend === backend && (engineMultimodal || !multimodal)) return engine
   if (engine) {
     const previous = engine
     engine = null
-    await previous.unload().catch(() => {})
+    await previous.unload()
     previous.close()
     conversations.clear()
     conversationPrompts.clear()
   }
   setState({ status: 'loading', error: undefined })
   engineLoading = (async () => {
-    const device = await inspectDevice()
-    if (!device.compatible) throw new LocalModelUnavailableError('Local AI requires a physical, supported device.')
-    if (!device.memoryReady) throw new LocalModelUnavailableError('This model needs more memory than this device has available.')
-    let selected = resolveBackend(backend, device)
+    // Never hand a truncated/stale download to the native bundle parser.
+    if (!MODEL_FILE.exists || MODEL_FILE.size !== LOCAL_MODEL.bytes) {
+      throw new LocalModelUnavailableError('The model file is incomplete. Delete it and download it again in AI Settings.')
+    }
+    const device = await inspectDevice(multimodal)
+    const selected = resolveBackend(backend, device, multimodal)
     const instance = localRuntime().createLLM()
     const config = {
       systemPrompt: system,
@@ -370,17 +401,19 @@ async function ensureEngine(backend: LocalBackend, system: string, multimodal: b
       topP: 0.95,
       multimodal,
       thinking: { enabled: false },
-      forceLoad: true,
+      forceLoad: false,
     }
     try {
       await instance.loadModel(MODEL_FILE.uri, config)
-    } catch (error) {
-      if (selected === 'cpu' || !isMemoryError(error)) {
-        instance.close()
-        throw error
+      if (!instance.isReady()) {
+        throw new LocalModelUnavailableError('Local AI was released because the device is low on memory. Close other apps and try again.')
       }
-      selected = 'cpu'
-      await instance.loadModel(MODEL_FILE.uri, { ...config, backend: 'cpu' })
+    } catch (error) {
+      // A failed initialization may still own native allocations. Free them
+      // before returning the error; do not retry on a half-initialized engine.
+      await instance.unload().catch(() => {})
+      instance.close()
+      throw error
     }
     engine = instance
     engineBackend = backend
@@ -402,31 +435,43 @@ async function ensureEngine(backend: LocalBackend, system: string, multimodal: b
 
 export async function loadLocalModel(backend: LocalBackend = 'auto', system = 'You are GabAI, a practical local safety assistant.') {
   if (!MODEL_FILE.exists) throw new LocalModelUnavailableError('Download the local model first in Chat settings.')
-  await ensureEngine(backend, system, true)
+  await withEngine(() => ensureEngine(backend, system, false))
 }
 
-export async function unloadEngine() {
+export function unloadEngine() {
+  return withEngine(unloadEngineLocked)
+}
+
+async function unloadEngineLocked() {
   const previous = engine
   engine = null
   engineBackend = null
   conversations.clear()
   conversationPrompts.clear()
   if (previous) {
-    await previous.unload().catch(() => {})
+    await previous.unload()
     previous.close()
   }
   setState({ status: MODEL_FILE.exists ? 'downloaded' : 'missing', error: undefined })
 }
 
-export async function releaseLocalConversation(conversationId = 'main') {
+export function releaseLocalConversation(conversationId = 'main') {
+  return withEngine(() => releaseConversationLocked(conversationId))
+}
+
+async function releaseConversationLocked(conversationId: string) {
   const handle = conversations.get(conversationId)
   conversations.delete(conversationId)
   conversationPrompts.delete(conversationId)
   await handle?.release().catch(() => {})
 }
 
-export async function deleteModel() {
-  await unloadEngine()
+export function deleteModel() {
+  return withEngine(deleteModelLocked)
+}
+
+async function deleteModelLocked() {
+  await unloadEngineLocked()
   await cancel()
   setState({ status: 'missing', progress: 0, downloadedBytes: 0, error: undefined })
 }
@@ -445,7 +490,11 @@ function transcript(history: { role: 'user' | 'assistant'; text: string; imageUr
   return lines.length ? `Conversation so far:\n${lines.join('\n')}\nContinue from here.\n` : ''
 }
 
-export async function generateLocal({
+export function generateLocal(input: Parameters<typeof generateLocalLocked>[0]) {
+  return withEngine(() => generateLocalLocked(input))
+}
+
+async function generateLocalLocked({
   system,
   history,
   nPredict,
@@ -473,9 +522,14 @@ export async function generateLocal({
   const multimodal = Boolean(current.imageUri || current.audioUri)
   let full = ''
   let audioPath: string | undefined
+  let imagePath: string | undefined
   try {
     const parts: MultimodalPart[] = []
-    if (current.imageUri) parts.push({ type: 'image', path: filePath(current.imageUri) })
+    if (current.imageUri) {
+      filePath(current.imageUri)
+      imagePath = await nativeDevice()?.prepareImage?.(current.imageUri)
+      parts.push({ type: 'image', path: imagePath ?? filePath(current.imageUri) })
+    }
     if (current.audioUri) {
       const native = nativeDevice()
       if (Platform.OS === 'android' && native?.prepareAudio) {
@@ -488,6 +542,11 @@ export async function generateLocal({
 
     const instance = await ensureEngine(backend, system, multimodal)
     if (signal?.aborted) return { text: '', usage: { promptTokens: 0, completionTokens: 0 } }
+    const memory = instance.getMemoryUsage()
+    const minimumFree = (multimodal ? 1024 : 512) * 1024 * 1024
+    if (memory.isLowMemory || memory.availableMemoryBytes < minimumFree) {
+      throw new LocalModelUnavailableError('Not enough free memory for this reply. Close other apps and try again, or use Cloud AI.')
+    }
     const modalities = instance.getModelInfo()?.modalities
     if (modalities && current.imageUri && !modalities.vision) {
       throw new LocalModelUnavailableError('The downloaded model cannot analyze photos.')
@@ -496,11 +555,13 @@ export async function generateLocal({
       throw new LocalModelUnavailableError('The downloaded model cannot analyze voice messages.')
     }
     const forecast = instance.getMemoryForecast()
-    if (forecast && forecast.contextTokensUsed > LOCAL_CONTEXT_TOKENS * 0.75) await releaseLocalConversation(conversationId)
-    if (conversationPrompts.get(conversationId) !== system) await releaseLocalConversation(conversationId)
+    if (forecast && forecast.contextTokensUsed > LOCAL_CONTEXT_TOKENS * 0.75) await releaseConversationLocked(conversationId)
+    if (conversationPrompts.get(conversationId) !== system) await releaseConversationLocked(conversationId)
     let conversation = conversations.get(conversationId)
     const newConversation = !conversation
     if (!conversation) {
+      // Keep only one native conversation/transcript alive on a phone.
+      for (const id of conversations.keys()) await releaseConversationLocked(id)
       conversation = instance.createConversation({ systemPrompt: system })
       conversations.set(conversationId, conversation)
       conversationPrompts.set(conversationId, system)
@@ -527,12 +588,14 @@ export async function generateLocal({
     }
   } catch (error) {
     if (signal?.aborted) return { text: full.trim(), usage: { promptTokens: 0, completionTokens: 0 } }
+    await releaseConversationLocked(conversationId)
     onReset?.()
     throw friendlyLocalError(error)
   } finally {
-    if (audioPath) {
-      const tempAudio = new File(audioPath.startsWith('file://') ? audioPath : `file://${audioPath}`)
-      if (tempAudio.exists) tempAudio.delete()
+    for (const path of [audioPath, imagePath]) {
+      if (!path) continue
+      const temporary = new File(path.startsWith('file://') ? path : `file://${path}`)
+      try { if (temporary.exists) temporary.delete() } catch {}
     }
   }
 }

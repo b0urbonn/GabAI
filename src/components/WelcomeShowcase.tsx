@@ -25,8 +25,8 @@ const HOLD_DURATION_MS = 2400
 /** Total Ken Burns settle duration across hold + transition. */
 const KEN_BURNS_DURATION_MS = HOLD_DURATION_MS + TRANSITION_DURATION_MS
 const INITIAL_KEN_BURNS_SCALE = 1.06
-/** Subtle cross-platform soft-focus blur so foreground copy stays calm and effortless to read. */
-const BACKGROUND_BLUR_RADIUS = Platform.select({ ios: 4, android: 3, default: 4 })
+/** Cross-platform soft-focus blur so foreground copy stays calm and effortless to read. */
+const BACKGROUND_BLUR_RADIUS = Platform.select({ ios: 9, android: 7, default: 8 })
 /** 80% background stage opacity requested for vibrant yet atmospheric DRRM imagery. */
 const BACKGROUND_STAGE_OPACITY = 0.8
 
@@ -62,6 +62,12 @@ const DRM_SLIDES: readonly DrmBackgroundSlide[] = [
     accessibilityLabel: 'Barangay health responders practicing hands-on CPR and emergency first aid',
   },
 ]
+
+const TEAM_NAMES = [
+  'Ruby Charlene Perilla',
+  'Terrence Briones',
+  'Lyka Tolosa',
+] as const
 
 type WelcomeShowcaseProps = {
   totalSteps?: number
@@ -293,7 +299,10 @@ export function WelcomeShowcase({ onGetStarted }: WelcomeShowcaseProps) {
           </AppText>
 
           <AppText variant="body" align="center" style={styles.description}>
-            Your offline companion for disaster preparedness, first aid guidance, and emergency assistance—anytime, anywhere.
+            Your offline-first AI-powered personal safety assistant.
+          </AppText>
+          <AppText variant="caption" align="center" style={styles.tagline}>
+            Always know what&rsquo;s next.
           </AppText>
 
           <View style={styles.actionWrap}>
@@ -314,6 +323,20 @@ export function WelcomeShowcase({ onGetStarted }: WelcomeShowcaseProps) {
                 <AppText variant="bodyStrong" align="center" style={{ color: brand.onPrimary }}>Get started</AppText>
               </View>
             </Touchable>
+          </View>
+        </View>
+
+        {/* Footer credits anchored to the bottom so the hero block stays optically centered */}
+        <View style={styles.credits}>
+          <AppText variant="eyebrow" align="center" style={styles.creditsHeading}>
+            Built by the Team Pixel6
+          </AppText>
+          <View style={styles.creditNames}>
+            {TEAM_NAMES.map((name) => (
+              <AppText key={name} variant="small" weight="600" align="center" style={styles.creditName}>
+                {name}
+              </AppText>
+            ))}
           </View>
         </View>
       </View>
@@ -344,6 +367,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: space[6],
   },
   heroBlock: {
+    flex: 1,
     width: '100%',
     maxWidth: 344,
     alignItems: 'center',
@@ -377,6 +401,14 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 8,
   },
+  tagline: {
+    marginTop: space[2],
+    color: 'rgba(255, 255, 255, 0.62)',
+    letterSpacing: 0.4,
+    textShadowColor: 'rgba(0, 0, 0, 0.36)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 8,
+  },
   actionWrap: {
     width: '100%',
     maxWidth: 224,
@@ -395,5 +427,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: space[4],
+  },
+  credits: {
+    width: '100%',
+    alignItems: 'center',
+    gap: space[2],
+  },
+  creditNames: {
+    alignItems: 'center',
+    gap: space[1],
+  },
+  creditsHeading: {
+    color: 'rgba(255, 255, 255, 0.55)',
+    textShadowColor: 'rgba(0, 0, 0, 0.36)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
+  },
+  creditName: {
+    fontSize: 12,
+    lineHeight: 15,
+    color: 'rgba(255, 255, 255, 0.92)',
+    textShadowColor: 'rgba(0, 0, 0, 0.36)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
   },
 })
