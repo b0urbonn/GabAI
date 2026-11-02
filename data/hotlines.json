@@ -1,0 +1,42 @@
+{
+  "version": "2026-11-02",
+  "note": "Emergency hotline directory for Marinduque. Compiled from public LGU/MDRRMO/BFP posts (Oct 2026) and the DILG MIMAROPA LGU directory. Draft: verify every number with each MDRRMO before release.",
+  "national": [
+    { "label": "National emergency (911)", "number": "911" },
+    { "label": "Philippine Red Cross", "number": "143" }
+  ],
+  "provincial": [
+    { "label": "Marinduque PDRRMO", "number": "(042) 332 1913" },
+    { "label": "Coast Guard Station Marinduque", "number": "0930 430 3182" },
+    { "label": "Marinduque Provincial Government", "number": "(042) 704 0144" }
+  ],
+  "municipalities": {
+    "Boac": [
+      { "label": "Boac MDRRMO 24/7 OpCen", "number": "0960 585 8800" },
+      { "label": "Boac Municipal Hall", "number": "(042) 311 1378" }
+    ],
+    "Buenavista": [
+      { "label": "Buenavista MDRRMO", "number": "0947 761 3187" },
+      { "label": "Buenavista Fire Station", "number": "(042) 704 0095" },
+      { "label": "Buenavista Municipal Hall", "number": "(042) 704 0062" }
+    ],
+    "Gasan": [
+      { "label": "Gasan Municipal Hall", "number": "(042) 342 1074" },
+      { "label": "Gasan Fire Station", "number": "(042) 332 0477" },
+      { "label": "Coast Guard Sub-Station Gasan", "number": "0910 473 9932" }
+    ],
+    "Mogpog": [
+      { "label": "Mogpog MDRRMO", "number": "0917 813 7880" },
+      { "label": "Mogpog Municipal Hall", "number": "(042) 332 1249" }
+    ],
+    "Santa Cruz": [
+      { "label": "Santa Cruz MDRRMO", "number": "0920 455 4034" },
+      { "label": "Santa Cruz BFP", "number": "0946 027 1055" },
+      { "label": "Santa Cruz PNP", "number": "0998 598 5806" }
+    ],
+    "Torrijos": [
+      { "label": "Torrijos Fire Station", "number": "0999 102 8059" },
+      { "label": "Torrijos Fire Station landline", "number": "(042) 754 2817" }
+    ]
+  }
+}

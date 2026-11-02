@@ -98,6 +98,39 @@ const migrations: ((db: SQLiteDatabase) => Promise<void>)[] = [
       );
     `)
   },
+  // User-added emergency contacts plus per-hotline number corrections, keyed by
+  // `contactKey` from `src/data/contacts` so a bundled row keeps its identity.
+  async (db) => {
+    await db.execAsync(`
+      CREATE TABLE emergency_contacts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        label TEXT NOT NULL,
+        number TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      );
+      CREATE TABLE emergency_contact_overrides (
+        key TEXT PRIMARY KEY NOT NULL,
+        number TEXT NOT NULL
+      );
+    `)
+  },
+  // Custom contacts can be filed under any list group ('mine', a municipality,
+  // 'Provincial', or 'National') so the directory stays organized.
+  async (db) => {
+    await db.execAsync(`ALTER TABLE emergency_contacts ADD COLUMN scope TEXT NOT NULL DEFAULT 'mine';`)
+  },
+  // Hotline numbers fetched from the remote directory manifest (DIRECTORY_SOURCE).
+  // They sit between bundled data and user overrides in precedence.
+  async (db) => {
+    await db.execAsync(`
+      CREATE TABLE emergency_remote_contacts (
+        scope TEXT NOT NULL,
+        label TEXT NOT NULL,
+        number TEXT NOT NULL,
+        PRIMARY KEY (scope, label)
+      );
+    `)
+  },
 ]
 
 export async function migrateDbIfNeeded(db: SQLiteDatabase) {

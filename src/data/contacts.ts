@@ -66,6 +66,64 @@ export const getLocalContacts = (municipality: Municipality, barangay?: string):
 
 export const toDialUri = (number: string) => `tel:${number.replace(/[^+\d]/g, '')}`
 
+/** Which bundled list a hotline belongs to: the municipality name, or 'Provincial' / 'National'. */
+export type ContactScope = Municipality | 'Provincial' | 'National'
+
+/** Where a user-added contact is filed: 'mine' = the "My contacts" group, else a bundled group. */
+export type CustomScope = ContactScope | 'mine'
+
+/** Stable identity for a bundled hotline, used to store user-corrected numbers. */
+export const contactKey = (scope: ContactScope, label: string) => `${scope}:${label}`
+
+/** Group labels the contact editor offers, in display order. */
+export const CONTACT_GROUPS = ['My contacts', ...MUNICIPALITIES, 'Provincial', 'National'] as const
+export type ContactGroup = (typeof CONTACT_GROUPS)[number]
+
+export const scopeFromGroup = (group: ContactGroup): CustomScope => (group === 'My contacts' ? 'mine' : group)
+export const groupFromScope = (scope: CustomScope): ContactGroup => (scope === 'mine' ? 'My contacts' : scope)
+
+export const isCustomScope = (value: unknown): value is CustomScope =>
+  value === 'mine' || value === 'Provincial' || value === 'National' || (MUNICIPALITIES as readonly string[]).includes(value as string)
+
+export const isContactScope = (value: unknown): value is ContactScope =>
+  value === 'Provincial' || value === 'National' || (MUNICIPALITIES as readonly string[]).includes(value as string)
+
+/**
+ * Where the in-app "Refresh" pulls the latest hotline directory from: the JSON manifest
+ * committed to this repository and served by GitHub's raw file host. Update
+ * `data/hotlines.json` and the running apps pick it up without an app update.
+ */
+export const DIRECTORY_SOURCE = {
+  label: 'github.com/TeSkiBoi/GabAI',
+  url: 'https://raw.githubusercontent.com/TeSkiBoi/GabAI/main/data/hotlines.json',
+} as const
+
+/** Resolves a `contactKey` back to its bundled row, or null when no bundled contact matches. */
+export function findBundledContact(key: string): { scope: ContactScope; contact: EmergencyContact } | null {
+  const separator = key.indexOf(':')
+  if (separator < 0) return null
+  const scope = key.slice(0, separator)
+  const label = key.slice(separator + 1)
+  let list: EmergencyContact[] | undefined
+  if (scope === 'Provincial') list = provincialContacts
+  else if (scope === 'National') list = nationalContacts
+  else if ((MUNICIPALITIES as readonly string[]).includes(scope)) {
+    const municipality = scope as Municipality
+    list = [...Object.values(barangayContacts[municipality] ?? {}).flat(), ...municipalContacts[municipality]]
+  }
+  const contact = list?.find((entry) => entry.label === label)
+  return contact ? { scope: scope as ContactScope, contact } : null
+}
+
+/**
+ * Loose check for hotline entry: 3–15 digits (911, 143, barangay lines qualify) plus
+ * the usual phone punctuation. Deliberately looser than the profile phone validator.
+ */
+export const isEmergencyNumber = (value: string) => {
+  const digits = value.replace(/\D/g, '')
+  return digits.length >= 3 && digits.length <= 15 && /^[\d\s()+.-]+$/.test(value.trim())
+}
+
 /** What kind of office a question is asking for: `ask` matches the question, `label` matches hotline labels. */
 const AGENCY_MATCHERS: { ask: RegExp; label: RegExp }[] = [
   { ask: /\b(fire|sunog|nasunog|bumbero|bfp)\b/i, label: /fire|bfp/i },

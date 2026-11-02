@@ -6,6 +6,7 @@ import { GroupedCard } from '@/components/ui/GroupedCard'
 import { Icon } from '@/components/ui/Icon'
 import { SettingsLabel } from '@/components/ui/Layout'
 import { ListRow } from '@/components/ui/ListRow'
+import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { Touchable } from '@/components/ui/Touchable'
 import type { LocalBackend, ReplyLength } from '@/db/settings'
 import { useSettings } from '@/providers/SettingsProvider'
@@ -219,36 +220,12 @@ export function LocalModelSection({ onFeedback }: { onFeedback: (feedback: Setti
                 {settings.localReplyLength === 'short' ? 'Short (~120 words)' : 'Detailed (up to 10 steps)'}
               </AppText>
             </View>
-            <View
-              style={[styles.segmentedTrack, { backgroundColor: colors.line }]}
-              accessibilityRole="radiogroup"
-              accessibilityLabel="Reply length"
-            >
-              {REPLY_LENGTHS.map((opt) => {
-                const selected = settings.localReplyLength === opt.value
-                return (
-                  <Touchable
-                    key={opt.value}
-                    onPress={() => void updateSettings({ localReplyLength: opt.value })}
-                    pressedScale={0.98}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected }}
-                    style={[
-                      styles.segmentTab,
-                      selected && [styles.segmentTabActive, { backgroundColor: colors.surface }],
-                    ]}
-                  >
-                    <AppText
-                      variant="small"
-                      tone={selected ? 'default' : 'soft'}
-                      weight={selected ? '600' : '500'}
-                    >
-                      {opt.label}
-                    </AppText>
-                  </Touchable>
-                )
-              })}
-            </View>
+            <SegmentedControl
+              label="Reply length"
+              options={REPLY_LENGTHS}
+              value={settings.localReplyLength}
+              onChange={(localReplyLength) => void updateSettings({ localReplyLength })}
+            />
           </View>
 
           <View style={styles.preferenceBlock}>
@@ -256,36 +233,12 @@ export function LocalModelSection({ onFeedback }: { onFeedback: (feedback: Setti
               <AppText weight="500">Compute backend</AppText>
               <AppText variant="caption" tone="soft">{settings.localBackend.toUpperCase()}</AppText>
             </View>
-            <View
-              style={[styles.segmentedTrack, { backgroundColor: colors.line }]}
-              accessibilityRole="radiogroup"
-              accessibilityLabel="Compute backend"
-            >
-              {BACKENDS.map((opt) => {
-                const selected = settings.localBackend === opt.value
-                return (
-                  <Touchable
-                    key={opt.value}
-                    onPress={() => void updateSettings({ localBackend: opt.value })}
-                    pressedScale={0.98}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected }}
-                    style={[
-                      styles.segmentTab,
-                      selected && [styles.segmentTabActive, { backgroundColor: colors.surface }],
-                    ]}
-                  >
-                    <AppText
-                      variant="small"
-                      tone={selected ? 'default' : 'soft'}
-                      weight={selected ? '600' : '500'}
-                    >
-                      {opt.label}
-                    </AppText>
-                  </Touchable>
-                )
-              })}
-            </View>
+            <SegmentedControl
+              label="Compute backend"
+              options={BACKENDS}
+              value={settings.localBackend}
+              onChange={(localBackend) => void updateSettings({ localBackend })}
+            />
           </View>
         </GroupedCard>
       </View>
@@ -393,26 +346,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  segmentedTrack: {
-    flexDirection: 'row',
-    borderRadius: radius.sm,
-    padding: 3,
-    gap: 3,
-  },
-  segmentTab: {
-    flex: 1,
-    height: 34,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.sm - 2,
-  },
-  segmentTabActive: {
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 1,
   },
   trailingCluster: {
     flexDirection: 'row',

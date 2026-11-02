@@ -8,7 +8,7 @@ export type IconName =
   | 'sun' | 'moon' | 'system' | 'send' | 'arrowLeft' | 'arrowUp' | 'check' | 'profile' | 'heart' | 'settings'
   | 'download' | 'restore' | 'trash' | 'camera' | 'image' | 'close' | 'calendar' | 'chevronDown'
   | 'cloud' | 'rain' | 'wind' | 'pin' | 'eye' | 'chart' | 'paperclip'
-  | 'shuffle' | 'sparkles' | 'edit' | 'mic' | 'stop' | 'speaker' | 'bell'
+  | 'shuffle' | 'sparkles' | 'edit' | 'mic' | 'stop' | 'speaker' | 'bell' | 'plus' | 'info'
 
 /** Stroke icon set ported 1:1 from the web prototype (24×24 grid, 1.8 stroke). */
 const paths: Record<IconName, ReactNode> = {
@@ -62,6 +62,8 @@ const paths: Record<IconName, ReactNode> = {
   stop: <Rect x="7" y="7" width="10" height="10" rx="2.5"/>,
   speaker: <><Path d="M11 5 6 9H2v6h4l5 4V5Z"/><Path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></>,
   bell: <><Path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><Path d="M13.73 21a2 2 0 0 1-3.46 0"/></>,
+  plus: <Path d="M12 5v14M5 12h14"/>,
+  info: <><Circle cx="12" cy="12" r="9"/><Path d="M12 11v5"/><Path d="M12 8h.01"/></>,
 }
 
 export function Icon({ name, size = 22, color }: { name: IconName; size?: number; color: ColorValue }) {

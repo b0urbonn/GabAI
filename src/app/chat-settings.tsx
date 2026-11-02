@@ -10,10 +10,10 @@ import { Icon, type IconName } from '@/components/ui/Icon'
 import { BackButton, Banner, PageHeader, SettingsLabel } from '@/components/ui/Layout'
 import { ListRow } from '@/components/ui/ListRow'
 import { Screen } from '@/components/ui/Screen'
-import { Touchable } from '@/components/ui/Touchable'
+import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import type { AiMode } from '@/db/settings'
 import { useSettings } from '@/providers/SettingsProvider'
-import { radius, space } from '@/theme/tokens'
+import { space } from '@/theme/tokens'
 import { useTheme } from '@/theme/useTheme'
 
 const AI_MODES: { value: AiMode; label: string; icon: IconName; footnote: string }[] = [
@@ -45,44 +45,15 @@ export default function ChatSettingsScreen() {
 
       <View style={styles.section}>
         <SettingsLabel>AI PROVIDER</SettingsLabel>
-        <View
-          style={[styles.segmentedTrack, { backgroundColor: colors.line }]}
-          accessibilityRole="radiogroup"
-          accessibilityLabel="AI provider"
-        >
-          {AI_MODES.map((option) => {
-            const selected = selectedMode.value === option.value
-            return (
-              <Touchable
-                key={option.value}
-                accessibilityRole="radio"
-                accessibilityState={{ selected }}
-                pressedScale={0.98}
-                onPress={() => {
-                  setFeedback(null)
-                  void updateSettings({ aiMode: option.value })
-                }}
-                style={[
-                  styles.segmentTab,
-                  selected && [styles.segmentTabActive, { backgroundColor: colors.surface }],
-                ]}
-              >
-                <Icon
-                  name={option.icon}
-                  size={16}
-                  color={selected ? colors.teal : colors.inkSoft}
-                />
-                <AppText
-                  variant="caption"
-                  weight={selected ? '600' : '500'}
-                  tone={selected ? 'default' : 'soft'}
-                >
-                  {option.label}
-                </AppText>
-              </Touchable>
-            )
-          })}
-        </View>
+        <SegmentedControl
+          label="AI provider"
+          options={AI_MODES}
+          value={selectedMode.value}
+          onChange={(aiMode) => {
+            setFeedback(null)
+            void updateSettings({ aiMode })
+          }}
+        />
         <AppText variant="small" tone="soft" style={styles.footnote}>
           {selectedMode.footnote}
         </AppText>
@@ -115,27 +86,5 @@ export default function ChatSettingsScreen() {
 const styles = StyleSheet.create({
   content: { width: '100%', maxWidth: 640, alignSelf: 'center' },
   section: { marginTop: space[6] },
-  segmentedTrack: {
-    flexDirection: 'row',
-    borderRadius: radius.md,
-    padding: 3,
-    gap: 3,
-  },
-  segmentTab: {
-    flex: 1,
-    height: 38,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: space[2],
-    borderRadius: radius.sm,
-  },
-  segmentTabActive: {
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    shadowOffset: { width: 0, height: 1.5 },
-    elevation: 2,
-  },
   footnote: { marginTop: space[2], marginHorizontal: space[4] },
 })
